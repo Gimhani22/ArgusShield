@@ -1,4 +1,6 @@
 import sys
+import json
+import os
 from PyQt5.QtWidgets import (
     QApplication,
     QWidget,
@@ -10,6 +12,7 @@ from PyQt5.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
     QHeaderView,
+    QMessageBox,
 )
 from PyQt5.QtCore import Qt
 
@@ -20,6 +23,12 @@ class DLLDetectorUI(QWidget):
 
         self.setWindowTitle("SentriX - DLL Injection Detector")
         self.setGeometry(100, 100, 1000, 600)
+        
+        # Configuration file path
+        self.config_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
+        
+        # Check installation status
+        self.is_installed = self.check_installation_status()
 
         # Main horizontal layout: sidebar + main area
         main_layout = QHBoxLayout(self)
@@ -79,6 +88,23 @@ class DLLDetectorUI(QWidget):
         stats_layout.addWidget(QLabel("Threats: 0"))
         layout.addWidget(stats_frame)
 
+        # Install/Uninstall button based on current status
+        if self.is_installed:
+            install_btn = QPushButton("Uninstall SentriX")
+            install_btn.setStyleSheet("background-color: #d32f2f; color: white; padding:8px; font-weight:bold;")
+            install_btn.clicked.connect(self.uninstall_application)
+            status_label = QLabel("Status: Installed and Active")
+            status_label.setStyleSheet("color: #4caf50; font-size:14pt; font-weight:bold;")
+        else:
+            install_btn = QPushButton("Install SentriX")
+            install_btn.setStyleSheet("background-color: #4caf50; color: white; padding:8px; font-weight:bold;")
+            install_btn.clicked.connect(self.install_application)
+            status_label = QLabel("Status: Not Installed")
+            status_label.setStyleSheet("color: #ff9800; font-size:14pt; font-weight:bold;")
+        
+        layout.addWidget(status_label)
+        layout.addWidget(install_btn)
+
         scan_btn = QPushButton("Run Full System Scan")
         scan_btn.setStyleSheet("background-color: firebrick; color: white; padding:8px;")
         layout.addWidget(scan_btn)
@@ -107,6 +133,61 @@ class DLLDetectorUI(QWidget):
                 table.setItem(r, c, QTableWidgetItem(value))
 
         layout.addWidget(table)
+
+    def check_installation_status(self):
+        """Check if the application is installed by reading the config file"""
+        try:
+            if os.path.exists(self.config_file):
+                with open(self.config_file, 'r') as f:
+                    config = json.load(f)
+                    return config.get('installed', False)
+        except Exception as e:
+            print(f"Error reading config: {e}")
+        return False
+
+    def save_installation_status(self, installed):
+        """Save the installation status to the config file"""
+        try:
+            config = {'installed': installed}
+            with open(self.config_file, 'w') as f:
+                json.dump(config, f)
+            self.is_installed = installed
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to save configuration: {e}")
+
+    def install_application(self):
+        """Handle the installation process"""
+        reply = QMessageBox.question(
+            self, 
+            'Install SentriX', 
+            'Do you want to install SentriX DLL Injection Detector?',
+            QMessageBox.Yes | QMessageBox.No, 
+            QMessageBox.No
+        )
+        
+        if reply == QMessageBox.Yes:
+            # Perform installation tasks here
+            # For example: register services, create shortcuts, etc.
+            self.save_installation_status(True)
+            QMessageBox.information(self, "Success", "SentriX has been installed successfully!")
+            self.show_dashboard()  # Refresh the dashboard
+
+    def uninstall_application(self):
+        """Handle the uninstallation process"""
+        reply = QMessageBox.question(
+            self, 
+            'Uninstall SentriX', 
+            'Are you sure you want to uninstall SentriX DLL Injection Detector?',
+            QMessageBox.Yes | QMessageBox.No, 
+            QMessageBox.No
+        )
+        
+        if reply == QMessageBox.Yes:
+            # Perform uninstallation tasks here
+            # For example: unregister services, remove shortcuts, etc.
+            self.save_installation_status(False)
+            QMessageBox.information(self, "Success", "SentriX has been uninstalled successfully!")
+            self.show_dashboard()  # Refresh the dashboard
 
 
 if __name__ == "__main__":
