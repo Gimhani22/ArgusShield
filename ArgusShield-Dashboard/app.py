@@ -21,7 +21,7 @@ class DLLDetectorUI(QWidget):
     def __init__(self):
         super().__init__()
 
-        self.setWindowTitle("SentriX - DLL Injection Detector")
+        self.setWindowTitle("ArgusShield - DLL Injection Detector")
         self.setGeometry(100, 100, 1000, 600)
         
         # Configuration file path
@@ -40,7 +40,7 @@ class DLLDetectorUI(QWidget):
         sidebar_layout = QVBoxLayout(sidebar)
         sidebar_layout.setContentsMargins(20, 20, 20, 20)
 
-        self.logo_label = QLabel("SENTRIX")
+        self.logo_label = QLabel("ArgusShield")
         self.logo_label.setStyleSheet("font-size:20pt; font-weight:bold;")
         sidebar_layout.addWidget(self.logo_label)
         sidebar_layout.addSpacing(10)
@@ -90,13 +90,13 @@ class DLLDetectorUI(QWidget):
 
         # Install/Uninstall button based on current status
         if self.is_installed:
-            install_btn = QPushButton("Uninstall SentriX")
+            install_btn = QPushButton("Uninstall ArgusShield")
             install_btn.setStyleSheet("background-color: #d32f2f; color: white; padding:8px; font-weight:bold;")
             install_btn.clicked.connect(self.uninstall_application)
             status_label = QLabel("Status: Installed and Active")
             status_label.setStyleSheet("color: #4caf50; font-size:14pt; font-weight:bold;")
         else:
-            install_btn = QPushButton("Install SentriX")
+            install_btn = QPushButton("Install ArgusShield")
             install_btn.setStyleSheet("background-color: #4caf50; color: white; padding:8px; font-weight:bold;")
             install_btn.clicked.connect(self.install_application)
             status_label = QLabel("Status: Not Installed")
@@ -159,8 +159,8 @@ class DLLDetectorUI(QWidget):
         """Handle the installation process"""
         reply = QMessageBox.question(
             self, 
-            'Install SentriX', 
-            'Do you want to install SentriX DLL Injection Detector?',
+            'Install ArgusShield ', 
+            'Do you want to install ArgusShield DLL Injection Detector?',
             QMessageBox.Yes | QMessageBox.No, 
             QMessageBox.No
         )
@@ -169,15 +169,15 @@ class DLLDetectorUI(QWidget):
             # Perform installation tasks here
             # For example: register services, create shortcuts, etc.
             self.save_installation_status(True)
-            QMessageBox.information(self, "Success", "SentriX has been installed successfully!")
+            QMessageBox.information(self, "Success", "ArgusShield has been installed successfully!")
             self.show_dashboard()  # Refresh the dashboard
 
     def uninstall_application(self):
         """Handle the uninstallation process"""
         reply = QMessageBox.question(
             self, 
-            'Uninstall SentriX', 
-            'Are you sure you want to uninstall SentriX DLL Injection Detector?',
+            'Uninstall ArgusShield', 
+            'Are you sure you want to uninstall ArgusShield DLL Injection Detector?',
             QMessageBox.Yes | QMessageBox.No, 
             QMessageBox.No
         )
@@ -186,7 +186,7 @@ class DLLDetectorUI(QWidget):
             # Perform uninstallation tasks here
             # For example: unregister services, remove shortcuts, etc.
             self.save_installation_status(False)
-            QMessageBox.information(self, "Success", "SentriX has been uninstalled successfully!")
+            QMessageBox.information(self, "Success", "ArgusShield has been uninstalled successfully!")
             self.show_dashboard()  # Refresh the dashboard
 
 
