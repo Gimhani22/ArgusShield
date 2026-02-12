@@ -13,9 +13,20 @@ from PyQt5.QtWidgets import (
     QTableWidgetItem,
     QHeaderView,
     QMessageBox,
+    QSystemTrayIcon,
+    QMenu,
+    QAction,
 )
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QIcon
 from database import create_db, get_install_state, set_install_state
+
+
+def get_resource_path(relative_path):
+    """Get absolute path to resource, works for dev and for PyInstaller"""
+    if hasattr(sys, '_MEIPASS'):
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), relative_path)
 
 
 class DLLDetectorUI(QWidget):
@@ -30,6 +41,9 @@ class DLLDetectorUI(QWidget):
         
         # Check installation status
         self.is_installed = get_install_state()
+        
+        # Setup system tray
+        self.setup_system_tray()
 
         # Main horizontal layout: sidebar + main area
         main_layout = QHBoxLayout(self)
@@ -67,6 +81,70 @@ class DLLDetectorUI(QWidget):
         main_layout.addWidget(self.main_frame, 1)
 
         self.show_dashboard()
+    
+    def setup_system_tray(self):
+        """Setup system tray icon and menu"""
+        self.tray_icon = QSystemTrayIcon(self)
+        
+        # Try to load icon, use default if not found
+        icon_path = get_resource_path("icon.ico")
+        if os.path.exists(icon_path):
+            self.tray_icon.setIcon(QIcon(icon_path))
+        else:
+            # Use application default icon
+            self.tray_icon.setIcon(self.style().standardIcon(self.style().SP_ComputerIcon))
+        
+        # Create tray menu
+        tray_menu = QMenu()
+        
+        show_action = QAction("Show Dashboard", self)
+        show_action.triggered.connect(self.show_window)
+        tray_menu.addAction(show_action)
+        
+        tray_menu.addSeparator()
+        
+        quit_action = QAction("Exit", self)
+        quit_action.triggered.connect(self.quit_application)
+        tray_menu.addAction(quit_action)
+        
+        self.tray_icon.setContextMenu(tray_menu)
+        self.tray_icon.setToolTip("ArgusShield - DLL Injection Detector")
+        
+        # Double-click to show window
+        self.tray_icon.activated.connect(self.tray_icon_activated)
+        
+        self.tray_icon.show()
+    
+    def tray_icon_activated(self, reason):
+        """Handle tray icon activation"""
+        if reason == QSystemTrayIcon.DoubleClick:
+            self.show_window()
+    
+    def show_window(self):
+        """Show and bring window to front"""
+        self.showNormal()
+        self.activateWindow()
+        self.raise_()
+    
+    def closeEvent(self, event):
+        """Minimize to tray instead of closing"""
+        event.ignore()
+        self.hide()
+        self.tray_icon.showMessage(
+            "ArgusShield",
+            "Application minimized to system tray. Right-click the tray icon for options.",
+            QSystemTrayIcon.Information,
+            2000
+        )
+    
+    def quit_application(self):
+        """Actually quit the application"""
+        self.tray_icon.hide()
+        QApplication.quit()
+    
+    def show_notification(self, title, message, icon=QSystemTrayIcon.Information):
+        """Show a system tray notification"""
+        self.tray_icon.showMessage(title, message, icon, 3000)
 
     def clear_main_frame(self):
         layout = self.main_frame.layout()
