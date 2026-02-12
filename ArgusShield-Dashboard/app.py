@@ -15,6 +15,7 @@ from PyQt5.QtWidgets import (
     QMessageBox,
 )
 from PyQt5.QtCore import Qt
+from database import create_db, get_install_state, set_install_state
 
 
 class DLLDetectorUI(QWidget):
@@ -24,11 +25,11 @@ class DLLDetectorUI(QWidget):
         self.setWindowTitle("ArgusShield - DLL Injection Detector")
         self.setGeometry(100, 100, 1000, 600)
         
-        # Configuration file path
-        self.config_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
+        # Initialize database
+        create_db()
         
         # Check installation status
-        self.is_installed = self.check_installation_status()
+        self.is_installed = get_install_state()
 
         # Main horizontal layout: sidebar + main area
         main_layout = QHBoxLayout(self)
@@ -134,27 +135,6 @@ class DLLDetectorUI(QWidget):
 
         layout.addWidget(table)
 
-    def check_installation_status(self):
-        """Check if the application is installed by reading the config file"""
-        try:
-            if os.path.exists(self.config_file):
-                with open(self.config_file, 'r') as f:
-                    config = json.load(f)
-                    return config.get('installed', False)
-        except Exception as e:
-            print(f"Error reading config: {e}")
-        return False
-
-    def save_installation_status(self, installed):
-        """Save the installation status to the config file"""
-        try:
-            config = {'installed': installed}
-            with open(self.config_file, 'w') as f:
-                json.dump(config, f)
-            self.is_installed = installed
-        except Exception as e:
-            QMessageBox.critical(self, "Error", f"Failed to save configuration: {e}")
-
     def install_application(self):
         """Handle the installation process"""
         reply = QMessageBox.question(
@@ -168,7 +148,8 @@ class DLLDetectorUI(QWidget):
         if reply == QMessageBox.Yes:
             # Perform installation tasks here
             # For example: register services, create shortcuts, etc.
-            self.save_installation_status(True)
+            set_install_state(True)
+            self.is_installed = True
             QMessageBox.information(self, "Success", "ArgusShield has been installed successfully!")
             self.show_dashboard()  # Refresh the dashboard
 
@@ -185,7 +166,8 @@ class DLLDetectorUI(QWidget):
         if reply == QMessageBox.Yes:
             # Perform uninstallation tasks here
             # For example: unregister services, remove shortcuts, etc.
-            self.save_installation_status(False)
+            set_install_state(False)
+            self.is_installed = False
             QMessageBox.information(self, "Success", "ArgusShield has been uninstalled successfully!")
             self.show_dashboard()  # Refresh the dashboard
 
