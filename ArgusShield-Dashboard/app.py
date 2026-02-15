@@ -34,7 +34,7 @@ class DLLDetectorUI(QWidget):
         super().__init__()
 
         self.setWindowTitle("ArgusShield - DLL Injection Detector")
-        self.setGeometry(100, 100, 1000, 600)
+        self.setGeometry(100, 100, 600, 400)
         
         # Initialize database
         create_db()
@@ -60,11 +60,11 @@ class DLLDetectorUI(QWidget):
         sidebar_layout.addWidget(self.logo_label)
         sidebar_layout.addSpacing(10)
 
-        self.btn_dashboard = QPushButton("Dashboard")
-        self.btn_monitor = QPushButton("Process Monitor")
-        self.btn_dashboard.clicked.connect(self.show_dashboard)
+        self.btn_home = QPushButton("Home")
+        self.btn_monitor = QPushButton("Scan")
+        self.btn_home.clicked.connect(self.show_dashboard)
         self.btn_monitor.clicked.connect(self.show_monitor)
-        sidebar_layout.addWidget(self.btn_dashboard)
+        sidebar_layout.addWidget(self.btn_home)
         sidebar_layout.addWidget(self.btn_monitor)
 
         sidebar_layout.addStretch()
@@ -97,7 +97,7 @@ class DLLDetectorUI(QWidget):
         # Create tray menu
         tray_menu = QMenu()
         
-        show_action = QAction("Show Dashboard", self)
+        show_action = QAction("Show ArgusShield", self)
         show_action.triggered.connect(self.show_window)
         tray_menu.addAction(show_action)
         
