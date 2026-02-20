@@ -1,11 +1,18 @@
 # -*- mode: python ; coding: utf-8 -*-
+import os
 
+# Path to the bin folder containing the background service
+# SPECPATH is the directory containing this spec file (ArgusShield-Dashboard)
+bin_folder = os.path.join(SPECPATH, 'bin')
 
 a = Analysis(
     ['app.py'],
     pathex=[],
     binaries=[],
-    datas=[],
+    datas=[
+        # Include the bin folder with ArgusShieldService.exe
+        (bin_folder, 'bin'),
+    ],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

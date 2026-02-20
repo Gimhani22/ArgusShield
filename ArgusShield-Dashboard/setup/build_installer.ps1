@@ -19,6 +19,28 @@ Write-Host "  ArgusShield Installer Builder" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
+# Paths
+$ServiceDir = Split-Path -Parent (Split-Path -Parent $ScriptDir)
+$ServiceExePath = Join-Path $ServiceDir "ArgusShieldService\x64\Debug\ArgusShieldService.exe"
+$BinDir = Join-Path $ProjectDir "bin"
+
+# Step 0: Copy service executable to bin folder
+Write-Host "[0/4] Setting up bin folder with service executable..." -ForegroundColor Green
+
+if (-not (Test-Path $BinDir)) {
+    New-Item -ItemType Directory -Path $BinDir -Force | Out-Null
+}
+
+if (Test-Path $ServiceExePath) {
+    Copy-Item $ServiceExePath -Destination $BinDir -Force
+    Write-Host "  Copied ArgusShieldService.exe to bin folder" -ForegroundColor Gray
+} else {
+    Write-Host "  WARNING: ArgusShieldService.exe not found at: $ServiceExePath" -ForegroundColor Yellow
+    Write-Host "  Make sure to build the service project first!" -ForegroundColor Yellow
+}
+
+Write-Host ""
+
 # Step 1: Build Python executable with PyInstaller
 if (-not $SkipPyInstaller) {
     Write-Host "[1/4] Building Python executable with PyInstaller..." -ForegroundColor Green

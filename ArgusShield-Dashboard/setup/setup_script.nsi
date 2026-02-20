@@ -75,6 +75,11 @@ Section "MainSection" SEC01
     ; Copy icon if exists
     File /nonfatal "..\dist\icon.ico"
     
+    ; Create bin folder and copy service executable
+    SetOutPath "$INSTDIR\bin"
+    File "..\bin\ArgusShieldService.exe"
+    SetOutPath "$INSTDIR"
+    
     ; Create Start Menu shortcuts
     CreateDirectory "$SMPROGRAMS\${PRODUCT_NAME}"
     CreateShortCut "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME}.lnk" "$INSTDIR\app.exe" "" "$INSTDIR\app.exe" 0
@@ -115,6 +120,11 @@ FunctionEnd
 ;--------------------------------
 ; Uninstaller Section
 Section Uninstall
+    ; Stop and remove the service first
+    nsExec::ExecToLog 'sc stop ArgusShieldService'
+    Sleep 2000
+    nsExec::ExecToLog 'sc delete ArgusShieldService'
+    
     ; Kill running process
     nsExec::ExecToLog 'taskkill /F /IM app.exe'
     
@@ -124,6 +134,8 @@ Section Uninstall
     ; Remove files and directories
     Delete "$INSTDIR\app.exe"
     Delete "$INSTDIR\icon.ico"
+    Delete "$INSTDIR\bin\ArgusShieldService.exe"
+    RMDir "$INSTDIR\bin"
     Delete "$INSTDIR\uninst.exe"
     RMDir "$INSTDIR"
     
