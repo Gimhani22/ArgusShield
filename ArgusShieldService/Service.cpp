@@ -1,27 +1,64 @@
 #include <windows.h>
 #include <fstream>
 #include <string>
+#include <sstream>
+#include <ctime>
 
 SERVICE_STATUS ServiceStatus;
 SERVICE_STATUS_HANDLE hStatus;
 HANDLE hServiceThread = NULL;
 bool g_Running = true;
 
+// Returns C:\ProgramData\ArgusShield\service.log
+// Creates the folder if it does not exist.
+static std::wstring GetLogPath()
+{
+    wchar_t programData[MAX_PATH] = {};
+    DWORD len = GetEnvironmentVariableW(L"ProgramData", programData, MAX_PATH);
+    if (len == 0)
+        wcscpy_s(programData, L"C:\\ProgramData");
+
+    std::wstring dir = std::wstring(programData) + L"\\ArgusShield";
+
+    // Create C:\ProgramData\ArgusShield if it doesn't already exist
+    CreateDirectoryW(dir.c_str(), NULL);
+
+    return dir + L"\\service.log";
+}
+
+static std::string CurrentTimestamp()
+{
+    std::time_t now = std::time(nullptr);
+    char buf[32] = {};
+    struct tm tm_info;
+    localtime_s(&tm_info, &now);
+    std::strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", &tm_info);
+    return std::string(buf);
+}
+
 void WriteLog(const std::string& message)
 {
-    std::ofstream log("C:\\TestServiceLog.txt", std::ios::app);
-    log << message << std::endl;
-    log.close();
+    static std::wstring logPath = GetLogPath();
+
+    std::ofstream log(logPath, std::ios::app);
+    if (log.is_open())
+    {
+        log << "[" << CurrentTimestamp() << "] " << message << std::endl;
+        log.close();
+    }
 }
 
 DWORD WINAPI ServiceThread(LPVOID lpParam)
 {
+    WriteLog("ArgusShield Service started.");
+
     while (g_Running)
     {
-        WriteLog("Test Service is running...");
+        WriteLog("ArgusShield Service is running...");
         Sleep(5000); // Sleep for 5 seconds
     }
 
+    WriteLog("ArgusShield Service stopped.");
     return ERROR_SUCCESS;
 }
 
@@ -55,7 +92,7 @@ void WINAPI ServiceMain(DWORD argc, LPWSTR* argv)
     ServiceStatus.dwCheckPoint = 0;
     ServiceStatus.dwWaitHint = 0;
 
-    hStatus = RegisterServiceCtrlHandler(L"TestService", ServiceCtrlHandler);
+    hStatus = RegisterServiceCtrlHandler(L"ArgusShieldService", ServiceCtrlHandler);
     if (hStatus == NULL)
         return;
 
@@ -69,7 +106,7 @@ int main()
 {
     SERVICE_TABLE_ENTRY ServiceTable[] =
     {
-        { (LPWSTR)L"TestService", (LPSERVICE_MAIN_FUNCTION)ServiceMain },
+        { (LPWSTR)L"ArgusShieldService", (LPSERVICE_MAIN_FUNCTION)ServiceMain },
         { NULL, NULL }
     };
 
