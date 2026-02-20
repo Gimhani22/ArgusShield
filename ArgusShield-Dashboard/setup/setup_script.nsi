@@ -88,9 +88,6 @@ Section "MainSection" SEC01
     ; Create Desktop shortcut
     CreateShortCut "$DESKTOP\${PRODUCT_NAME}.lnk" "$INSTDIR\app.exe" "" "$INSTDIR\app.exe" 0
     
-    ; Register application for Windows startup (system tray)
-    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Run" "${PRODUCT_NAME}" '"$INSTDIR\app.exe"'
-    
     ; Store installation folder
     WriteRegStr HKLM "${PRODUCT_DIR_REGKEY}" "" "$INSTDIR\app.exe"
     
@@ -127,9 +124,6 @@ Section Uninstall
     
     ; Kill running process
     nsExec::ExecToLog 'taskkill /F /IM app.exe'
-    
-    ; Remove from Windows startup
-    DeleteRegValue HKLM "Software\Microsoft\Windows\CurrentVersion\Run" "${PRODUCT_NAME}"
     
     ; Remove files and directories
     Delete "$INSTDIR\app.exe"

@@ -692,7 +692,23 @@ class DLLDetectorUI(QWidget):
             return False
 
     def get_service_path(self):
-        """Get the path to the ArgusShieldService.exe"""
+        """Get the path to the ArgusShieldService.exe
+        
+        When installed via NSI, the service exe lives in the bin folder
+        next to app.exe (e.g. C:\Program Files (x86)\ArgusShield\bin\).
+        Fall back to PyInstaller's temp _MEIPASS folder for dev/testing.
+        """
+        # Prefer the permanent installed location next to the executable
+        if hasattr(sys, '_MEIPASS'):
+            app_dir = os.path.dirname(os.path.abspath(sys.executable))
+        else:
+            app_dir = os.path.dirname(os.path.abspath(__file__))
+        
+        service_path = os.path.join(app_dir, 'bin', 'ArgusShieldService.exe')
+        if os.path.exists(service_path):
+            return service_path
+        
+        # Fallback to PyInstaller bundled resource
         return os.path.join(get_resource_path('bin'), 'ArgusShieldService.exe')
 
     def install_application(self):
