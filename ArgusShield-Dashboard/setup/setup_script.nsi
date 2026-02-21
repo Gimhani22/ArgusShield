@@ -117,15 +117,15 @@ FunctionEnd
 ;--------------------------------
 ; Uninstaller Section
 Section Uninstall
-    ; Stop and remove the service first
+    ; Stop and remove the Windows service first
     nsExec::ExecToLog 'sc stop ArgusShieldService'
     Sleep 2000
     nsExec::ExecToLog 'sc delete ArgusShieldService'
     
-    ; Kill running process
+    ; Kill running dashboard process
     nsExec::ExecToLog 'taskkill /F /IM ArgusShield.exe'
     
-    ; Remove files and directories
+    ; Remove files and directories (Program Files x86)
     Delete "$INSTDIR\ArgusShield.exe"
     Delete "$INSTDIR\icon.ico"
     Delete "$INSTDIR\bin\ArgusShieldService.exe"
@@ -141,12 +141,18 @@ Section Uninstall
     ; Remove Desktop shortcut
     Delete "$DESKTOP\${PRODUCT_NAME}.lnk"
     
-    ; Remove registry keys
+    ; Remove uninstall & app path registry keys
     DeleteRegKey ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}"
     DeleteRegKey HKLM "${PRODUCT_DIR_REGKEY}"
     
-    ; Remove AppData folder (optional - uncomment if you want to remove user data)
-    ; RMDir /r "$APPDATA\${PRODUCT_NAME}"
+    ; Remove startup registry entry (HKCU\...\Run\ArgusShield)
+    DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "ArgusShield"
+    
+    ; Remove user data folder: %APPDATA%\ArgusShield (contains database)
+    RMDir /r "$APPDATA\${PRODUCT_NAME}"
+    
+    ; Remove ProgramData folder: %ProgramData%\ArgusShield (contains service log)
+    RMDir /r "$COMMONAPPDATA\${PRODUCT_NAME}"
     
     SetAutoClose true
 SectionEnd
