@@ -773,6 +773,14 @@ class DLLDetectorUI(QWidget):
                 ]
                 subprocess.run(desc_cmd, capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW)
                 
+                # Configure automatic restart on failure (restart after 5 seconds, up to 3 times)
+                failure_cmd = [
+                    'sc', 'failure', service_name,
+                    'reset=', '86400',
+                    'actions=', 'restart/5000/restart/5000/restart/5000'
+                ]
+                subprocess.run(failure_cmd, capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW)
+
                 # Start the service
                 start_cmd = ['sc', 'start', service_name]
                 subprocess.run(start_cmd, capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW)

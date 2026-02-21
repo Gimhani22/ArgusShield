@@ -50,11 +50,10 @@ void WriteLog(const std::string& message)
 
 DWORD WINAPI ServiceThread(LPVOID lpParam)
 {
-    WriteLog("ArgusShield Service started.");
+    WriteLog("ArgusShield initialized");
 
     while (g_Running)
     {
-        WriteLog("ArgusShield Service is running...");
         Sleep(5000); // Sleep for 5 seconds
     }
 
