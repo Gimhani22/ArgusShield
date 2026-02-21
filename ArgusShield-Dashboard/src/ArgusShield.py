@@ -4,6 +4,7 @@ import os
 import random
 import subprocess
 import ctypes
+import ctypes.wintypes
 import winreg
 from PyQt5.QtWidgets import (
     QApplication,
@@ -29,6 +30,12 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, QSize
 from PyQt5.QtGui import QIcon, QFont, QPainter, QPen, QColor, QPainterPath
 from database import create_db, get_install_state, set_install_state
+
+# Windows message sent by the shell whenever the taskbar is (re)created.
+# Listening for this lets us re-show the tray icon after Explorer crashes/
+# restarts and – crucially – when the app is launched early at Windows login
+# before the notification area is fully ready.
+_WM_TASKBARCREATED: int = ctypes.windll.user32.RegisterWindowMessageW("TaskbarCreated")
 
 
 def get_resource_path(relative_path):
@@ -168,8 +175,14 @@ class ThreatActivityChart(QWidget):
 
 
 class DLLDetectorUI(QWidget):
-    def __init__(self):
+    def __init__(self, tray_only: bool = False):
         super().__init__()
+
+        # In tray-only (startup) mode set Qt.Tool so the window never shows
+        # up in the Windows taskbar, which lets Windows classify the process
+        # as a "Background Application" in Task Manager / Startup settings.
+        if tray_only:
+            self.setWindowFlags(Qt.Tool)
 
         self.setWindowTitle("ArgusShield")
         self.setGeometry(100, 100, 1000, 650)
@@ -369,13 +382,37 @@ class DLLDetectorUI(QWidget):
         
         self.tray_icon.show()
     
+    def nativeEvent(self, eventType, message):
+        """Catch the TaskbarCreated broadcast so we can re-show the tray icon
+        whenever the Windows shell (re)creates the notification area – this
+        covers both Explorer crashes and the app starting before the tray is
+        ready at Windows login.
+        """
+        if eventType == b"windows_generic_MSG":
+            try:
+                msg = ctypes.cast(
+                    int(message), ctypes.POINTER(ctypes.wintypes.MSG)
+                ).contents
+                if msg.message == _WM_TASKBARCREATED:
+                    self.tray_icon.show()
+            except Exception:
+                pass
+        return False, 0
+
     def tray_icon_activated(self, reason):
         """Handle tray icon activation"""
         if reason == QSystemTrayIcon.DoubleClick:
             self.show_window()
     
     def show_window(self):
-        """Show and bring window to front"""
+        """Show and bring window to front.
+
+        If the window was created with Qt.Tool (tray-only startup mode) remove
+        that flag first so the window gets a normal taskbar button when opened
+        by the user.
+        """
+        if self.windowFlags() & Qt.Tool:
+            self.setWindowFlags(self.windowFlags() & ~Qt.Tool)
         self.showNormal()
         self.activateWindow()
         self.raise_()
@@ -946,6 +983,10 @@ if __name__ == "__main__":
     start_to_tray = "--startup" in sys.argv
 
     app = QApplication(sys.argv)
+    
+    # CRITICAL: Keep app running when window is hidden (background/tray mode)
+    # Without this, the app would exit when the main window is closed/hidden
+    app.setQuitOnLastWindowClosed(False)
 
     # Apply dark theme stylesheet matching the design
     app.setStyleSheet("""
@@ -1152,9 +1193,8 @@ if __name__ == "__main__":
         }
     """)
 
-    window = DLLDetectorUI()
+    window = DLLDetectorUI(tray_only=start_to_tray)
     if start_to_tray:
-        # Launched at Windows startup – stay in the tray, don't show the window
         window.tray_icon.showMessage(
             "ArgusShield",
             "ArgusShield is running in the background and protecting your system.",
