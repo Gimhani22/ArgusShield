@@ -6,7 +6,7 @@ import os
 bin_folder = os.path.join(SPECPATH, 'bin')
 
 a = Analysis(
-    ['app.py'],
+    [os.path.join('src', 'ArgusShield.py')],
     pathex=[],
     binaries=[],
     datas=[
@@ -29,7 +29,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='app',
+    name='ArgusShield',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

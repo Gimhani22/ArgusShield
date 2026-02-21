@@ -12,7 +12,7 @@
 !define PRODUCT_VERSION "1.0.0"
 !define PRODUCT_PUBLISHER "ArgusShield Security"
 !define PRODUCT_WEB_SITE "https://argusshield.com"
-!define PRODUCT_DIR_REGKEY "Software\Microsoft\Windows\CurrentVersion\App Paths\app.exe"
+!define PRODUCT_DIR_REGKEY "Software\Microsoft\Windows\CurrentVersion\App Paths\ArgusShield.exe"
 !define PRODUCT_UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}"
 !define PRODUCT_UNINST_ROOT_KEY "HKLM"
 
@@ -47,7 +47,7 @@ ShowUnInstDetails show
 !insertmacro MUI_PAGE_LICENSE "license.txt"
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
-!define MUI_FINISHPAGE_RUN "$INSTDIR\app.exe"
+!define MUI_FINISHPAGE_RUN "$INSTDIR\ArgusShield.exe"
 !define MUI_FINISHPAGE_RUN_TEXT "Launch ${PRODUCT_NAME}"
 !define MUI_FINISHPAGE_SHOWREADME ""
 !define MUI_FINISHPAGE_SHOWREADME_NOTCHECKED
@@ -70,7 +70,7 @@ Section "MainSection" SEC01
     SetOverwrite on
     
     ; Copy main application files
-    File "..\dist\app.exe"
+    File "..\dist\ArgusShield.exe"
     
     ; Copy icon if exists
     File /nonfatal "..\dist\icon.ico"
@@ -82,14 +82,14 @@ Section "MainSection" SEC01
     
     ; Create Start Menu shortcuts
     CreateDirectory "$SMPROGRAMS\${PRODUCT_NAME}"
-    CreateShortCut "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME}.lnk" "$INSTDIR\app.exe" "" "$INSTDIR\app.exe" 0
+    CreateShortCut "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME}.lnk" "$INSTDIR\ArgusShield.exe" "" "$INSTDIR\ArgusShield.exe" 0
     CreateShortCut "$SMPROGRAMS\${PRODUCT_NAME}\Uninstall.lnk" "$INSTDIR\uninst.exe" "" "" 0
     
     ; Create Desktop shortcut
-    CreateShortCut "$DESKTOP\${PRODUCT_NAME}.lnk" "$INSTDIR\app.exe" "" "$INSTDIR\app.exe" 0
+    CreateShortCut "$DESKTOP\${PRODUCT_NAME}.lnk" "$INSTDIR\ArgusShield.exe" "" "$INSTDIR\ArgusShield.exe" 0
     
     ; Store installation folder
-    WriteRegStr HKLM "${PRODUCT_DIR_REGKEY}" "" "$INSTDIR\app.exe"
+    WriteRegStr HKLM "${PRODUCT_DIR_REGKEY}" "" "$INSTDIR\ArgusShield.exe"
     
     ; Create uninstaller
     WriteUninstaller "$INSTDIR\uninst.exe"
@@ -97,7 +97,7 @@ Section "MainSection" SEC01
     ; Write uninstall information to registry
     WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "DisplayName" "${PRODUCT_NAME}"
     WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "UninstallString" "$INSTDIR\uninst.exe"
-    WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "DisplayIcon" "$INSTDIR\app.exe"
+    WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "DisplayIcon" "$INSTDIR\ArgusShield.exe"
     WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "DisplayVersion" "${PRODUCT_VERSION}"
     WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "Publisher" "${PRODUCT_PUBLISHER}"
     WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "URLInfoAbout" "${PRODUCT_WEB_SITE}"
@@ -111,7 +111,7 @@ SectionEnd
 ;--------------------------------
 ; Desktop shortcut function (called from finish page)
 Function CreateDesktopShortcut
-    CreateShortCut "$DESKTOP\${PRODUCT_NAME}.lnk" "$INSTDIR\app.exe" "" "$INSTDIR\app.exe" 0
+    CreateShortCut "$DESKTOP\${PRODUCT_NAME}.lnk" "$INSTDIR\ArgusShield.exe" "" "$INSTDIR\ArgusShield.exe" 0
 FunctionEnd
 
 ;--------------------------------
@@ -123,10 +123,10 @@ Section Uninstall
     nsExec::ExecToLog 'sc delete ArgusShieldService'
     
     ; Kill running process
-    nsExec::ExecToLog 'taskkill /F /IM app.exe'
+    nsExec::ExecToLog 'taskkill /F /IM ArgusShield.exe'
     
     ; Remove files and directories
-    Delete "$INSTDIR\app.exe"
+    Delete "$INSTDIR\ArgusShield.exe"
     Delete "$INSTDIR\icon.ico"
     Delete "$INSTDIR\bin\ArgusShieldService.exe"
     RMDir "$INSTDIR\bin"

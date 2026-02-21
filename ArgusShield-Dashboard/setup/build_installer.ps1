@@ -48,7 +48,7 @@ if (-not $SkipPyInstaller) {
     Push-Location $ProjectDir
     
     # Use spec file for admin privileges
-    $SpecFile = Join-Path $ProjectDir "app.spec"
+    $SpecFile = Join-Path $ProjectDir "ArgusShield.spec"
     
     if (Test-Path $SpecFile) {
         Write-Host "  Using spec file: $SpecFile" -ForegroundColor Gray
@@ -56,7 +56,7 @@ if (-not $SkipPyInstaller) {
     } else {
         # Fallback to direct build with admin privileges
         Write-Host "  Building with default options (no spec file)..." -ForegroundColor Gray
-        & python -m PyInstaller --onefile --windowed --uac-admin --name=app --clean app.py
+        & python -m PyInstaller --onefile --windowed --uac-admin --name=ArgusShield --clean src\ArgusShield.py
     }
     
     if ($LASTEXITCODE -ne 0) {
@@ -148,10 +148,10 @@ Write-Host ""
 if (-not $SkipNSIS -and $NSISPath) {
     Write-Host "[4/4] Building NSIS installer..." -ForegroundColor Green
     
-    # Check if app.exe exists
-    $AppExePath = Join-Path $DistDir "app.exe"
+    # Check if ArgusShield.exe exists
+    $AppExePath = Join-Path $DistDir "ArgusShield.exe"
     if (-not (Test-Path $AppExePath)) {
-        Write-Host "  ERROR: app.exe not found in dist folder!" -ForegroundColor Red
+        Write-Host "  ERROR: ArgusShield.exe not found in dist folder!" -ForegroundColor Red
         Write-Host "  Run without -SkipPyInstaller first." -ForegroundColor Red
         exit 1
     }
@@ -191,8 +191,8 @@ Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Output files in: $DistDir" -ForegroundColor White
 
-if (Test-Path (Join-Path $DistDir "app.exe")) {
-    Write-Host "  - app.exe (standalone executable)" -ForegroundColor Gray
+if (Test-Path (Join-Path $DistDir "ArgusShield.exe")) {
+    Write-Host "  - ArgusShield.exe (standalone executable)" -ForegroundColor Gray
 }
 if (Test-Path (Join-Path $DistDir "ArgusShield_Setup.exe")) {
     Write-Host "  - ArgusShield_Setup.exe (installer)" -ForegroundColor Gray
