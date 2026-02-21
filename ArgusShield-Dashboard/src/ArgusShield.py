@@ -4,6 +4,7 @@ import os
 import random
 import subprocess
 import ctypes
+import winreg
 from PyQt5.QtWidgets import (
     QApplication,
     QWidget,
@@ -35,6 +36,68 @@ def get_resource_path(relative_path):
     if hasattr(sys, '_MEIPASS'):
         return os.path.join(sys._MEIPASS, relative_path)
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), relative_path)
+
+
+def get_executable_path():
+    """Return the path to the running executable (or script in dev mode)."""
+    if hasattr(sys, '_MEIPASS'):
+        # Running as a PyInstaller bundle
+        return os.path.abspath(sys.executable)
+    # Running as a plain Python script
+    return os.path.abspath(sys.argv[0])
+
+
+def ensure_startup_registered():
+    """Add ArgusShield to the Windows startup registry if not already present.
+
+    Uses HKCU so no admin rights are needed.  The app is launched with the
+    --startup flag so it opens silently in the system tray.
+    """
+    reg_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
+    value_name = "ArgusShield"
+    exe_path = get_executable_path()
+    startup_cmd = f'"{exe_path}" --startup'
+
+    try:
+        key = winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER,
+            reg_path,
+            0,
+            winreg.KEY_QUERY_VALUE | winreg.KEY_SET_VALUE,
+        )
+        try:
+            existing, _ = winreg.QueryValueEx(key, value_name)
+            if existing == startup_cmd:
+                # Already registered correctly
+                winreg.CloseKey(key)
+                return
+        except FileNotFoundError:
+            pass  # Key not present yet – will be written below
+
+        winreg.SetValueEx(key, value_name, 0, winreg.REG_SZ, startup_cmd)
+        winreg.CloseKey(key)
+    except Exception as e:
+        print(f"[ArgusShield] Could not register startup entry: {e}")
+
+
+def remove_startup_entry():
+    """Remove ArgusShield from the Windows startup registry."""
+    reg_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
+    value_name = "ArgusShield"
+    try:
+        key = winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER,
+            reg_path,
+            0,
+            winreg.KEY_SET_VALUE,
+        )
+        try:
+            winreg.DeleteValue(key, value_name)
+        except FileNotFoundError:
+            pass
+        winreg.CloseKey(key)
+    except Exception as e:
+        print(f"[ArgusShield] Could not remove startup entry: {e}")
 
 
 class ThreatActivityChart(QWidget):
@@ -114,6 +177,9 @@ class DLLDetectorUI(QWidget):
         
         # Initialize database
         create_db()
+
+        # Register in Windows startup on first run (and whenever the entry is missing)
+        ensure_startup_registered()
         
         # Check installation status
         self.is_installed = get_install_state()
@@ -875,6 +941,10 @@ class DLLDetectorUI(QWidget):
 
 
 if __name__ == "__main__":
+    # When launched by Windows at startup (via the registry Run key) the app
+    # receives --startup and should open silently in the system tray.
+    start_to_tray = "--startup" in sys.argv
+
     app = QApplication(sys.argv)
 
     # Apply dark theme stylesheet matching the design
@@ -1083,5 +1153,14 @@ if __name__ == "__main__":
     """)
 
     window = DLLDetectorUI()
-    window.show()
+    if start_to_tray:
+        # Launched at Windows startup – stay in the tray, don't show the window
+        window.tray_icon.showMessage(
+            "ArgusShield",
+            "ArgusShield is running in the background and protecting your system.",
+            QSystemTrayIcon.Information,
+            3000,
+        )
+    else:
+        window.show()
     sys.exit(app.exec_())
