@@ -130,18 +130,19 @@ class ThreatActivityChart(QWidget):
         chart_height = height - margin_top - margin_bottom
         
         # Draw Y-axis labels
-        painter.setPen(QPen(QColor('#6b7280'), 1))
+        painter.setPen(QPen(QColor('#3d444d'), 1))
         painter.setFont(QFont('Segoe UI', 8))
         for i in range(5):
             y = margin_top + (chart_height * i / 4)
             value = 4 - i
+            painter.setPen(QPen(QColor('#8b949e'), 1))
             painter.drawText(5, int(y + 5), str(value))
             # Draw horizontal grid line
-            painter.setPen(QPen(QColor('#374151'), 1, Qt.DotLine))
+            painter.setPen(QPen(QColor('#21262d'), 1, Qt.DotLine))
             painter.drawLine(margin_left, int(y), width - margin_right, int(y))
-            painter.setPen(QPen(QColor('#6b7280'), 1))
         
         # Draw X-axis labels
+        painter.setPen(QPen(QColor('#8b949e'), 1))
         for i, day in enumerate(self.days):
             x = margin_left + (chart_width * i / (len(self.days) - 1))
             painter.drawText(int(x - 15), height - 10, day)
@@ -185,7 +186,7 @@ class DLLDetectorUI(QWidget):
             self.setWindowFlags(Qt.Tool)
 
         self.setWindowTitle("ArgusShield")
-        self.setGeometry(100, 100, 1000, 650)
+        self.setGeometry(100, 100, 600, 650)
         self.setMinimumSize(900, 600)
         
         # Initialize database
@@ -247,23 +248,29 @@ class DLLDetectorUI(QWidget):
         logo_layout.setContentsMargins(0, 0, 0, 20)
         logo_layout.setSpacing(10)
         
-        # Shield icon (using text as placeholder)
-        shield_label = QLabel("🛡")
-        shield_label.setStyleSheet("font-size: 24px; color: #10b981;")
+        # Logo mark (rectangular badge)
+        shield_label = QLabel("A")
+        shield_label.setFixedSize(32, 32)
+        shield_label.setAlignment(Qt.AlignCenter)
+        shield_label.setStyleSheet("""
+            font-size: 16px; font-weight: bold; color: #111827;
+            background-color: #10b981;
+            border: none;
+        """)
         logo_layout.addWidget(shield_label)
         
         logo_text = QLabel("ArgusShield")
-        logo_text.setStyleSheet("font-size: 16px; font-weight: bold; color: #ffffff;")
+        logo_text.setStyleSheet("font-size: 15px; font-weight: bold; color: #ffffff; letter-spacing: 1px;")
         logo_layout.addWidget(logo_text)
         logo_layout.addStretch()
         
         sidebar_layout.addWidget(logo_frame)
 
         # Navigation buttons
-        self.btn_dashboard = self.create_nav_button("📊", "Dashboard")
-        self.btn_about = self.create_nav_button("ℹ", "About")
-        self.btn_quarantine = self.create_nav_button("🗂", "Quarantine")
-        self.btn_notifications = self.create_nav_button("🔔", "Notifications")
+        self.btn_dashboard = self.create_nav_button("Dashboard")
+        self.btn_about = self.create_nav_button("About")
+        self.btn_quarantine = self.create_nav_button("Quarantine")
+        self.btn_notifications = self.create_nav_button("Notifications")
         
         self.btn_dashboard.clicked.connect(lambda: self.navigate_to('dashboard'))
         self.btn_about.clicked.connect(lambda: self.navigate_to('about'))
@@ -278,7 +285,7 @@ class DLLDetectorUI(QWidget):
         sidebar_layout.addStretch()
 
         # Install Agent button
-        self.install_btn = QPushButton("⬇  Install Agent")
+        self.install_btn = QPushButton("Install Agent")
         self.install_btn.setObjectName("installButton")
         self.install_btn.setCursor(Qt.PointingHandCursor)
         self.install_btn.clicked.connect(self.toggle_install)
@@ -287,9 +294,9 @@ class DLLDetectorUI(QWidget):
 
         return sidebar
     
-    def create_nav_button(self, icon, text):
+    def create_nav_button(self, text):
         """Create a navigation button for the sidebar"""
-        btn = QPushButton(f"  {icon}   {text}")
+        btn = QPushButton(f"  {text}")
         btn.setObjectName("navButton")
         btn.setCursor(Qt.PointingHandCursor)
         btn.setCheckable(True)
@@ -317,32 +324,34 @@ class DLLDetectorUI(QWidget):
     def update_install_button(self):
         """Update install button text based on installation state"""
         if self.is_installed:
-            self.install_btn.setText("⬆  Uninstall Agent")
+            self.install_btn.setText("Uninstall Agent")
             self.install_btn.setStyleSheet("""
                 QPushButton {
                     background-color: #dc2626;
                     color: white;
                     border: none;
-                    border-radius: 8px;
+                    border-radius: 0px;
                     padding: 12px 20px;
-                    font-size: 13px;
+                    font-size: 12px;
                     font-weight: bold;
+                    letter-spacing: 0.5px;
                 }
                 QPushButton:hover {
                     background-color: #b91c1c;
                 }
             """)
         else:
-            self.install_btn.setText("⬇  Install Agent")
+            self.install_btn.setText("Install Agent")
             self.install_btn.setStyleSheet("""
                 QPushButton {
                     background-color: #10b981;
-                    color: white;
+                    color: #111827;
                     border: none;
-                    border-radius: 8px;
+                    border-radius: 0px;
                     padding: 12px 20px;
-                    font-size: 13px;
+                    font-size: 12px;
                     font-weight: bold;
+                    letter-spacing: 0.5px;
                 }
                 QPushButton:hover {
                     background-color: #059669;
@@ -444,26 +453,36 @@ class DLLDetectorUI(QWidget):
             if child.widget():
                 child.widget().deleteLater()
 
-    def create_status_card(self, icon, title, subtitle, card_type="default"):
+    def create_status_card(self, badge, title, subtitle, card_type="default"):
         """Create a status card widget"""
         card = QFrame()
         card.setObjectName(f"statusCard_{card_type}")
         card_layout = QVBoxLayout(card)
         card_layout.setContentsMargins(20, 20, 20, 20)
-        card_layout.setSpacing(10)
+        card_layout.setSpacing(8)
         
-        # Icon
-        icon_label = QLabel(icon)
-        icon_label.setStyleSheet(f"""
-            font-size: 32px;
-            color: {'#10b981' if card_type == 'secure' else '#9ca3af'};
-        """)
-        card_layout.addWidget(icon_label)
+        # Status badge (text label)
+        badge_label = QLabel(badge)
+        badge_label.setFixedSize(64, 22)
+        badge_label.setAlignment(Qt.AlignCenter)
+        if card_type == 'secure':
+            badge_label.setStyleSheet("""
+                font-size: 10px; font-weight: bold; color: #111827;
+                background-color: #10b981; border: none; letter-spacing: 1px;
+            """)
+        else:
+            badge_label.setStyleSheet("""
+                font-size: 10px; font-weight: bold; color: #9ca3af;
+                background-color: #374151; border: none; letter-spacing: 1px;
+            """)
+        card_layout.addWidget(badge_label)
+        
+        card_layout.addSpacing(6)
         
         # Title
         title_label = QLabel(title)
         title_label.setStyleSheet(f"""
-            font-size: 20px;
+            font-size: 18px;
             font-weight: bold;
             color: {'#10b981' if card_type == 'secure' else '#ffffff'};
         """)
@@ -471,7 +490,7 @@ class DLLDetectorUI(QWidget):
         
         # Subtitle
         subtitle_label = QLabel(subtitle)
-        subtitle_label.setStyleSheet("font-size: 12px; color: #9ca3af;")
+        subtitle_label.setStyleSheet("font-size: 12px; color: #6b7280; line-height: 1.4;")
         subtitle_label.setWordWrap(True)
         card_layout.addWidget(subtitle_label)
         
@@ -488,16 +507,19 @@ class DLLDetectorUI(QWidget):
         
         # Name label
         name_label = QLabel(name)
-        name_label.setStyleSheet("font-size: 13px; color: #d1d5db;")
+        name_label.setStyleSheet("font-size: 12px; color: #8b949e; letter-spacing: 0.2px;")
         indicator_layout.addWidget(name_label)
         
         indicator_layout.addStretch()
         
-        # Status dot
-        dot_label = QLabel("●")
+        # Status indicator
+        dot_label = QLabel("ACTIVE" if is_active else "OFF")
         dot_label.setStyleSheet(f"""
-            font-size: 12px;
-            color: {'#10b981' if is_active else '#ef4444'};
+            font-size: 10px; font-weight: bold; letter-spacing: 0.5px;
+            color: {'#0d1117' if is_active else '#8b949e'};
+            background-color: {'#10b981' if is_active else '#21262d'};
+            padding: 2px 6px;
+            border: none;
         """)
         indicator_layout.addWidget(dot_label)
         
@@ -517,22 +539,15 @@ class DLLDetectorUI(QWidget):
         status_section = QVBoxLayout()
         
         title_label = QLabel("System Status: Protected")
-        title_label.setStyleSheet("font-size: 22px; font-weight: bold; color: #ffffff;")
+        title_label.setStyleSheet("font-size: 18px; font-weight: bold; color: #e6edf3; letter-spacing: 0.5px;")
         status_section.addWidget(title_label)
         
-        status_indicator = QLabel("● Real-time protection is active")
-        status_indicator.setStyleSheet("font-size: 13px; color: #10b981;")
+        status_indicator = QLabel("\u25a0  Real-time protection is active")
+        status_indicator.setStyleSheet("font-size: 11px; color: #10b981; letter-spacing: 0.5px;")
         status_section.addWidget(status_indicator)
         
         header_layout.addLayout(status_section)
         header_layout.addStretch()
-        
-        # Notification bell
-        bell_btn = QPushButton("🔔")
-        bell_btn.setObjectName("iconButton")
-        bell_btn.setFixedSize(40, 40)
-        bell_btn.setCursor(Qt.PointingHandCursor)
-        header_layout.addWidget(bell_btn)
         
         layout.addWidget(header_frame)
 
@@ -544,7 +559,7 @@ class DLLDetectorUI(QWidget):
         
         # Secure card
         secure_card = self.create_status_card(
-            "✓",
+            "PROTECTED",
             "Secure",
             "Your device is protected against all known threats.",
             "secure"
@@ -553,7 +568,7 @@ class DLLDetectorUI(QWidget):
         
         # Quick Scan card
         quick_scan_card = self.create_status_card(
-            "⚡",
+            "ACTION",
             "Quick Scan",
             "Scan critical system areas for active threats.",
             "default"
@@ -563,7 +578,7 @@ class DLLDetectorUI(QWidget):
         
         # Last Scan card
         last_scan_card = self.create_status_card(
-            "🕐",
+            "STATUS",
             "Last Scan",
             "Completed 2 hours ago. No threats found.",
             "default"
@@ -586,8 +601,8 @@ class DLLDetectorUI(QWidget):
         
         # Chart header
         chart_header = QHBoxLayout()
-        chart_title = QLabel("⚠ Threat Activity")
-        chart_title.setStyleSheet("font-size: 14px; font-weight: bold; color: #ffffff;")
+        chart_title = QLabel("THREAT ACTIVITY")
+        chart_title.setStyleSheet("font-size: 11px; font-weight: bold; color: #8b949e; letter-spacing: 1px;")
         chart_header.addWidget(chart_title)
         chart_header.addStretch()
         
@@ -610,8 +625,8 @@ class DLLDetectorUI(QWidget):
         protection_layout = QVBoxLayout(protection_frame)
         protection_layout.setContentsMargins(20, 15, 20, 15)
         
-        protection_title = QLabel("Protection Status")
-        protection_title.setStyleSheet("font-size: 14px; font-weight: bold; color: #ffffff;")
+        protection_title = QLabel("PROTECTION STATUS")
+        protection_title.setStyleSheet("font-size: 11px; font-weight: bold; color: #8b949e; letter-spacing: 1px;")
         protection_layout.addWidget(protection_title)
         
         protection_layout.addSpacing(10)
@@ -641,7 +656,7 @@ class DLLDetectorUI(QWidget):
         layout = self.main_frame.layout()
 
         title = QLabel("About ArgusShield")
-        title.setStyleSheet("font-size: 22px; font-weight: bold; color: #ffffff;")
+        title.setStyleSheet("font-size: 18px; font-weight: bold; color: #e6edf3; letter-spacing: 0.5px;")
         layout.addWidget(title)
         
         info_frame = QFrame()
@@ -651,30 +666,42 @@ class DLLDetectorUI(QWidget):
         info_layout.setSpacing(15)
         
         version_label = QLabel("Version: 1.0.0")
-        version_label.setStyleSheet("font-size: 14px; color: #d1d5db;")
+        version_label.setStyleSheet("font-size: 12px; color: #8b949e; letter-spacing: 0.3px;")
         info_layout.addWidget(version_label)
         
         desc_label = QLabel("ArgusShield is an advanced DLL injection detection system designed to protect your system from malicious software and security threats.")
-        desc_label.setStyleSheet("font-size: 14px; color: #9ca3af;")
+        desc_label.setStyleSheet("font-size: 13px; color: #6e7681; line-height: 1.5;")
         desc_label.setWordWrap(True)
         info_layout.addWidget(desc_label)
         
-        features_title = QLabel("Key Features:")
-        features_title.setStyleSheet("font-size: 16px; font-weight: bold; color: #ffffff; margin-top: 10px;")
+        features_title = QLabel("KEY FEATURES")
+        features_title.setStyleSheet("font-size: 11px; font-weight: bold; color: #8b949e; margin-top: 10px; letter-spacing: 1px;")
         info_layout.addWidget(features_title)
         
         features = [
-            "• Real-time DLL injection detection",
-            "• Network firewall monitoring", 
-            "• Email protection scanning",
-            "• Ransomware shield",
-            "• Web protection"
+            "Real-time DLL injection detection",
+            "Network firewall monitoring",
+            "Email protection scanning",
+            "Ransomware shield",
+            "Web protection"
         ]
         
         for feature in features:
+            feat_frame = QFrame()
+            feat_frame.setStyleSheet("background-color: transparent; border: none;")
+            feat_lay = QHBoxLayout(feat_frame)
+            feat_lay.setContentsMargins(0, 2, 0, 2)
+            feat_lay.setSpacing(10)
+            tick = QLabel()
+            tick.setFixedSize(6, 6)
+            tick.setStyleSheet("background-color: #10b981; border: none;")
+            feat_lay.addWidget(tick)
+            feat_lay.setAlignment(tick, Qt.AlignVCenter)
             feature_label = QLabel(feature)
-            feature_label.setStyleSheet("font-size: 13px; color: #10b981;")
-            info_layout.addWidget(feature_label)
+            feature_label.setStyleSheet("font-size: 13px; color: #c9d1d9;")
+            feat_lay.addWidget(feature_label)
+            feat_lay.addStretch()
+            info_layout.addWidget(feat_frame)
         
         info_layout.addStretch()
         layout.addWidget(info_frame, 1)
@@ -685,11 +712,11 @@ class DLLDetectorUI(QWidget):
         layout = self.main_frame.layout()
 
         title = QLabel("Quarantine")
-        title.setStyleSheet("font-size: 22px; font-weight: bold; color: #ffffff;")
+        title.setStyleSheet("font-size: 18px; font-weight: bold; color: #e6edf3; letter-spacing: 0.5px;")
         layout.addWidget(title)
         
         subtitle = QLabel("Isolated threats are stored here for your review")
-        subtitle.setStyleSheet("font-size: 13px; color: #9ca3af;")
+        subtitle.setStyleSheet("font-size: 12px; color: #6e7681; margin-top: 4px;")
         layout.addWidget(subtitle)
         
         layout.addSpacing(20)
@@ -703,8 +730,8 @@ class DLLDetectorUI(QWidget):
         table.setRowCount(0)
         
         # Empty state
-        empty_label = QLabel("🛡️ No threats in quarantine")
-        empty_label.setStyleSheet("font-size: 16px; color: #6b7280; padding: 40px;")
+        empty_label = QLabel("No threats in quarantine")
+        empty_label.setStyleSheet("font-size: 13px; color: #6e7681; padding: 40px; letter-spacing: 0.3px;")
         empty_label.setAlignment(Qt.AlignCenter)
         
         layout.addWidget(table)
@@ -722,22 +749,30 @@ class DLLDetectorUI(QWidget):
         
         layout.addSpacing(20)
         
+        # Notification type colors
+        type_colors = {"success": "#10b981", "info": "#3b82f6", "warning": "#f59e0b"}
+        
         # Sample notifications
         notifications = [
-            {"icon": "✓", "title": "System scan completed", "time": "2 hours ago", "type": "success"},
-            {"icon": "🛡", "title": "Real-time protection enabled", "time": "1 day ago", "type": "info"},
-            {"icon": "⚠", "title": "Database updated successfully", "time": "2 days ago", "type": "warning"},
+            {"title": "System scan completed", "time": "2 hours ago", "type": "success"},
+            {"title": "Real-time protection enabled", "time": "1 day ago", "type": "info"},
+            {"title": "Database updated successfully", "time": "2 days ago", "type": "warning"},
         ]
         
         for notif in notifications:
             notif_frame = QFrame()
             notif_frame.setObjectName("notificationItem")
             notif_layout = QHBoxLayout(notif_frame)
-            notif_layout.setContentsMargins(15, 12, 15, 12)
+            notif_layout.setContentsMargins(0, 12, 15, 12)
+            notif_layout.setSpacing(0)
             
-            icon_label = QLabel(notif["icon"])
-            icon_label.setStyleSheet("font-size: 20px;")
-            notif_layout.addWidget(icon_label)
+            # Colored left accent bar
+            accent = QFrame()
+            accent.setFixedWidth(4)
+            accent.setStyleSheet(f"background-color: {type_colors.get(notif['type'], '#374151')}; border: none;")
+            notif_layout.addWidget(accent)
+            
+            notif_layout.addSpacing(15)
             
             text_layout = QVBoxLayout()
             title_label = QLabel(notif["title"])
@@ -988,208 +1023,218 @@ if __name__ == "__main__":
     # Without this, the app would exit when the main window is closed/hidden
     app.setQuitOnLastWindowClosed(False)
 
-    # Apply dark theme stylesheet matching the design
+    # Apply dark professional stylesheet — fully rectangular design
     app.setStyleSheet("""
+        * {
+            border-radius: 0px;
+        }
+
         QWidget {
-            background-color: #111827;
-            color: #ffffff;
+            background-color: #0d1117;
+            color: #e6edf3;
             font-family: 'Segoe UI', Arial, sans-serif;
+            font-size: 13px;
         }
-        
+
+        /* ── Sidebar ─────────────────────────────────── */
         #sidebar {
-            background-color: #1f2937;
-            border-right: 1px solid #374151;
+            background-color: #161b22;
+            border-right: 1px solid #21262d;
         }
-        
+
         #mainFrame {
-            background-color: #111827;
+            background-color: #0d1117;
         }
-        
+
+        /* ── Nav buttons ─────────────────────────────── */
         #navButton {
             background-color: transparent;
-            color: #9ca3af;
+            color: #8b949e;
             border: none;
-            border-radius: 8px;
-            padding: 12px 15px;
+            border-left: 3px solid transparent;
+            padding: 11px 15px;
             font-size: 13px;
             text-align: left;
+            letter-spacing: 0.3px;
         }
-        
+
         #navButton:hover {
-            background-color: #374151;
-            color: #ffffff;
+            background-color: #1c2128;
+            color: #e6edf3;
+            border-left: 3px solid #30363d;
         }
-        
+
         #navButton:checked {
-            background-color: #10b981;
-            color: #ffffff;
+            background-color: #1c2128;
+            color: #10b981;
+            border-left: 3px solid #10b981;
+            font-weight: bold;
         }
-        
-        #iconButton {
-            background-color: #1f2937;
-            border: 1px solid #374151;
-            border-radius: 8px;
-            font-size: 16px;
-        }
-        
-        #iconButton:hover {
-            background-color: #374151;
-        }
-        
+
+        /* ── Status cards ────────────────────────────── */
         #statusCard_secure {
-            background-color: rgba(16, 185, 129, 0.15);
+            background-color: #0d1f17;
             border: 1px solid #10b981;
-            border-radius: 12px;
-            min-height: 140px;
+            border-top: 3px solid #10b981;
+            min-height: 150px;
         }
-        
+
         #statusCard_default {
-            background-color: #1f2937;
-            border: 1px solid #374151;
-            border-radius: 12px;
-            min-height: 140px;
+            background-color: #161b22;
+            border: 1px solid #21262d;
+            border-top: 3px solid #30363d;
+            min-height: 150px;
         }
-        
+
         #statusCard_default:hover {
-            border-color: #4b5563;
+            border-color: #3d444d;
+            border-top-color: #10b981;
         }
-        
+
+        /* ── Chart and panels ────────────────────────── */
         #chartFrame {
-            background-color: #1f2937;
-            border: 1px solid #374151;
-            border-radius: 12px;
+            background-color: #161b22;
+            border: 1px solid #21262d;
         }
-        
+
         #protectionFrame {
-            background-color: #1f2937;
-            border: 1px solid #374151;
-            border-radius: 12px;
+            background-color: #161b22;
+            border: 1px solid #21262d;
             min-width: 220px;
         }
-        
+
         #infoFrame {
-            background-color: #1f2937;
-            border: 1px solid #374151;
-            border-radius: 12px;
+            background-color: #161b22;
+            border: 1px solid #21262d;
         }
-        
+
+        /* ── Buttons ─────────────────────────────────── */
+        #manageButton {
+            background-color: #21262d;
+            color: #c9d1d9;
+            border: 1px solid #30363d;
+            padding: 10px 20px;
+            font-size: 12px;
+            letter-spacing: 0.3px;
+        }
+
+        #manageButton:hover {
+            background-color: #30363d;
+            color: #e6edf3;
+            border-color: #3d444d;
+        }
+
+        /* ── Combo box ───────────────────────────────── */
         #timeCombo {
-            background-color: #374151;
-            border: 1px solid #4b5563;
-            border-radius: 6px;
+            background-color: #21262d;
+            border: 1px solid #30363d;
             padding: 5px 10px;
-            color: #ffffff;
-            min-width: 100px;
+            color: #c9d1d9;
+            min-width: 110px;
+            selection-background-color: #10b981;
         }
-        
+
         #timeCombo::drop-down {
             border: none;
             width: 20px;
         }
-        
-        #timeCombo QAbstractItemView {
-            background-color: #374151;
-            color: #ffffff;
+
+        QComboBox QAbstractItemView {
+            background-color: #21262d;
+            color: #c9d1d9;
+            border: 1px solid #30363d;
             selection-background-color: #10b981;
+            selection-color: #0d1117;
+            outline: none;
         }
-        
-        #manageButton {
-            background-color: #374151;
-            color: #ffffff;
+
+        /* ── Notifications ───────────────────────────── */
+        #notificationItem {
+            background-color: #161b22;
+            border: 1px solid #21262d;
+            border-bottom: 1px solid #21262d;
+            min-height: 54px;
+            margin-bottom: 6px;
+        }
+
+        #notificationItem:hover {
+            background-color: #1c2128;
+            border-color: #30363d;
+        }
+
+        /* ── Tables ──────────────────────────────────── */
+        QTableWidget {
+            background-color: #161b22;
+            color: #c9d1d9;
+            gridline-color: #21262d;
+            border: 1px solid #21262d;
+        }
+
+        QTableWidget::item {
+            padding: 10px 8px;
+            border-bottom: 1px solid #21262d;
+        }
+
+        QTableWidget::item:selected {
+            background-color: #1c2128;
+            color: #e6edf3;
+        }
+
+        QTableWidget QHeaderView::section {
+            background-color: #161b22;
+            color: #8b949e;
+            padding: 10px 8px;
             border: none;
-            border-radius: 8px;
-            padding: 10px 20px;
+            border-bottom: 2px solid #21262d;
+            font-weight: bold;
+            font-size: 11px;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        /* ── Scrollbar ───────────────────────────────── */
+        QScrollBar:vertical {
+            background-color: #0d1117;
+            width: 8px;
+            border: none;
+        }
+
+        QScrollBar::handle:vertical {
+            background-color: #21262d;
+            min-height: 30px;
+        }
+
+        QScrollBar::handle:vertical:hover {
+            background-color: #30363d;
+        }
+
+        QScrollBar::add-line:vertical,
+        QScrollBar::sub-line:vertical {
+            height: 0px;
+        }
+
+        /* ── Message boxes ───────────────────────────── */
+        QMessageBox {
+            background-color: #161b22;
+        }
+
+        QMessageBox QLabel {
+            color: #e6edf3;
             font-size: 13px;
         }
-        
-        #manageButton:hover {
-            background-color: #4b5563;
-        }
-        
-        #notificationItem {
-            background-color: #1f2937;
-            border: 1px solid #374151;
-            border-radius: 8px;
-            margin-bottom: 8px;
-        }
-        
-        #notificationItem:hover {
-            border-color: #4b5563;
-        }
-        
-        #quarantineTable {
-            background-color: #1f2937;
-            border: 1px solid #374151;
-            border-radius: 8px;
-            gridline-color: #374151;
-        }
-        
-        #quarantineTable::item {
-            padding: 10px;
-        }
-        
-        #quarantineTable QHeaderView::section {
-            background-color: #374151;
-            color: #ffffff;
-            padding: 10px;
-            border: none;
-            font-weight: bold;
-        }
-        
-        QTableWidget {
-            background-color: #1f2937;
-            color: #ffffff;
-            gridline-color: #374151;
-            border: 1px solid #374151;
-            border-radius: 8px;
-        }
-        
-        QTableWidget::item {
-            padding: 8px;
-        }
-        
-        QTableWidget QHeaderView::section {
-            background-color: #374151;
-            color: #ffffff;
-            padding: 10px;
-            border: none;
-        }
-        
-        QScrollBar:vertical {
-            background-color: #1f2937;
-            width: 10px;
-            border-radius: 5px;
-        }
-        
-        QScrollBar::handle:vertical {
-            background-color: #4b5563;
-            border-radius: 5px;
-            min-height: 20px;
-        }
-        
-        QScrollBar::handle:vertical:hover {
-            background-color: #6b7280;
-        }
-        
-        QMessageBox {
-            background-color: #1f2937;
-        }
-        
-        QMessageBox QLabel {
-            color: #ffffff;
-        }
-        
+
         QMessageBox QPushButton {
-            background-color: #374151;
-            color: #ffffff;
-            border: none;
-            border-radius: 6px;
+            background-color: #21262d;
+            color: #c9d1d9;
+            border: 1px solid #30363d;
             padding: 8px 20px;
             min-width: 80px;
+            font-size: 12px;
         }
-        
+
         QMessageBox QPushButton:hover {
-            background-color: #4b5563;
+            background-color: #30363d;
+            border-color: #3d444d;
         }
     """)
 
