@@ -1,20 +1,110 @@
-// ArgusShieldAgent.cpp : This file contains the 'main' function. Program execution begins and ends there.
-//
+#include <windows.h>
 
 #include <iostream>
+#include <sstream>
+#include <string>
+#include <vector>
+
+static const wchar_t* kPipeName = L"\\\\.\\pipe\\ArgusShieldEtw";
+
+static bool ConnectPipe(HANDLE& pipeHandle)
+{
+    pipeHandle = CreateFileW(
+        kPipeName,
+        GENERIC_READ,
+        0,
+        nullptr,
+        OPEN_EXISTING,
+        FILE_ATTRIBUTE_NORMAL,
+        nullptr);
+
+    if (pipeHandle == INVALID_HANDLE_VALUE)
+        return false;
+
+    DWORD mode = PIPE_READMODE_MESSAGE;
+    SetNamedPipeHandleState(pipeHandle, &mode, nullptr, nullptr);
+    return true;
+}
+
+static void ProcessLine(const std::string& line)
+{
+    if (line.rfind("ImageLoad|", 0) != 0)
+        return;
+
+    std::string pid;
+    std::string base;
+    std::string size;
+    std::string path;
+
+    std::istringstream stream(line);
+    std::string token;
+    while (std::getline(stream, token, '|'))
+    {
+        if (token.rfind("pid=", 0) == 0)
+            pid = token.substr(4);
+        else if (token.rfind("base=", 0) == 0)
+            base = token.substr(5);
+        else if (token.rfind("size=", 0) == 0)
+            size = token.substr(5);
+        else if (token.rfind("path=", 0) == 0)
+            path = token.substr(5);
+    }
+
+    std::cout << "[ImageLoad] pid=" << pid
+              << " base=" << base
+              << " size=" << size
+              << " path=" << path
+              << std::endl;
+
+    // LoadLibrary detection is based on image load events.
+    // Add correlation rules here (OpenProcess -> WriteProcessMemory -> CreateRemoteThread).
+}
+
+static void ReadPipe(HANDLE pipeHandle)
+{
+    std::string pending;
+    std::vector<char> buffer(4096);
+
+    while (true)
+    {
+        DWORD bytesRead = 0;
+        BOOL ok = ReadFile(pipeHandle, buffer.data(), static_cast<DWORD>(buffer.size()), &bytesRead, nullptr);
+        if (!ok || bytesRead == 0)
+            break;
+
+        pending.append(buffer.data(), buffer.data() + bytesRead);
+
+        size_t pos = 0;
+        while ((pos = pending.find('\n')) != std::string::npos)
+        {
+            std::string line = pending.substr(0, pos);
+            pending.erase(0, pos + 1);
+            if (!line.empty())
+                ProcessLine(line);
+        }
+    }
+}
 
 int main()
 {
-    std::cout << "Hello World!\n";
+    std::cout << "ArgusShield Agent: waiting for ETW service stream..." << std::endl;
+
+    while (true)
+    {
+        HANDLE pipeHandle = INVALID_HANDLE_VALUE;
+        if (!ConnectPipe(pipeHandle))
+        {
+            Sleep(1000);
+            continue;
+        }
+
+        std::cout << "Connected to ETW pipe." << std::endl;
+        ReadPipe(pipeHandle);
+
+        CloseHandle(pipeHandle);
+        std::cout << "Pipe disconnected. Reconnecting..." << std::endl;
+        Sleep(1000);
+    }
+
+    return 0;
 }
-
-// Run program: Ctrl + F5 or Debug > Start Without Debugging menu
-// Debug program: F5 or Debug > Start Debugging menu
-
-// Tips for Getting Started: 
-//   1. Use the Solution Explorer window to add/manage files
-//   2. Use the Team Explorer window to connect to source control
-//   3. Use the Output window to see build output and other messages
-//   4. Use the Error List window to view errors
-//   5. Go to Project > Add New Item to create new code files, or Project > Add Existing Item to add existing code files to the project
-//   6. In the future, to open this project again, go to File > Open > Project and select the .sln file
