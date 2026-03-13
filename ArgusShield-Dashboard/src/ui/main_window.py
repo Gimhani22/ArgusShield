@@ -29,7 +29,9 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle('ArgusShield')
-        self.setFixedSize(1300, 800)
+        # Don't hard-lock the window size; on small VM screens a fixed 1300x800
+        # pushes the title bar off-screen (appearing to remove minimize/close).
+        self.resize(1300, 800)
         self.center_on_screen()
 
         # Ensure database exists and read persisted install state
@@ -99,10 +101,24 @@ class MainWindow(QMainWindow):
         self.switch_page(0)
 
     def center_on_screen(self):
-        geo = self.frameGeometry()
-        screen = QApplication.primaryScreen().availableGeometry().center()
-        geo.moveCenter(screen)
-        self.move(geo.topLeft())
+        screen_geo = QApplication.primaryScreen().availableGeometry()
+
+        # If the current window is bigger than the available screen area,
+        # shrink it so the title bar stays visible.
+        margin = 40
+        max_w = max(320, screen_geo.width() - margin)
+        max_h = max(240, screen_geo.height() - margin)
+        new_w = min(self.width(), max_w)
+        new_h = min(self.height(), max_h)
+        if new_w != self.width() or new_h != self.height():
+            self.resize(new_w, new_h)
+
+        x = screen_geo.left() + (screen_geo.width() - self.width()) // 2
+        y = screen_geo.top() + (screen_geo.height() - self.height()) // 2
+
+        x = max(screen_geo.left(), min(x, screen_geo.left() + screen_geo.width() - self.width()))
+        y = max(screen_geo.top(),  min(y, screen_geo.top()  + screen_geo.height() - self.height()))
+        self.move(x, y)
 
     def toggle_install(self):
         """Handle Install/Uninstall button click."""
