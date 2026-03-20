@@ -4,14 +4,72 @@
 #include <tdh.h>
 #include <vector>
 #include <atomic>
+#include <unordered_map>
+#include <unordered_set>
+#include <mutex>
+#include <algorithm>
+#include <cctype>
 
 #pragma comment(lib, "tdh.lib")
+#pragma comment(lib, "advapi32.lib")
 
 static TRACEHANDLE g_sessionHandle = 0;
 static TRACEHANDLE g_traceHandle = 0;
 static EVENT_TRACE_PROPERTIES* g_properties = nullptr;
 static std::atomic_bool g_running{ false };
 static ImageLoadCallback g_callback;
+static InjectionAlertCallback g_alertCallback;
+
+// ── Injection detection state ──────────────────────────────────────────────
+// We keep a set of "known-safe" DLL directories.  Any DLL loaded from
+// outside these paths is suspicious – especially when the loading event's
+// thread PID differs from the target PID (cross-process image load).
+// ────────────────────────────────────────────────────────────────────────────
+
+static std::mutex g_detectionMutex;
+
+// Track which PIDs have loaded which DLLs already (startup baseline)
+static std::unordered_map<DWORD, std::unordered_set<std::wstring>> g_processBaseline;
+static bool g_baselinePhase = true;   // first 5 seconds = baseline
+static ULONGLONG g_sessionStartTick = 0;
+
+// Trusted DLL directories (case-insensitive comparison done in helper)
+static bool IsTrustedPath(const std::wstring& path)
+{
+    if (path.empty()) return true;
+
+    // Lowercase copy
+    std::wstring lower = path;
+    std::transform(lower.begin(), lower.end(), lower.begin(), ::towlower);
+
+    // System directories
+    if (lower.find(L"\\windows\\system32\\") != std::wstring::npos) return true;
+    if (lower.find(L"\\windows\\syswow64\\") != std::wstring::npos) return true;
+    if (lower.find(L"\\windows\\winsxs\\")   != std::wstring::npos) return true;
+    if (lower.find(L"\\windows\\microsoft.net\\") != std::wstring::npos) return true;
+
+    // Common safe app paths
+    if (lower.find(L"\\program files\\")     != std::wstring::npos) return true;
+    if (lower.find(L"\\program files (x86)\\") != std::wstring::npos) return true;
+
+    return false;
+}
+
+static std::wstring GetFilenameFromPath(const std::wstring& path)
+{
+    auto pos = path.find_last_of(L"\\/");
+    if (pos != std::wstring::npos)
+        return path.substr(pos + 1);
+    return path;
+}
+
+void SetInjectionAlertCallback(InjectionAlertCallback callback)
+{
+    std::lock_guard<std::mutex> lk(g_detectionMutex);
+    g_alertCallback = std::move(callback);
+}
+
+// ── TDH helpers ────────────────────────────────────────────────────────────
 
 static bool FindPropertyInfo(
     const TRACE_EVENT_INFO* info,
@@ -143,6 +201,8 @@ static bool GetPropertyString(PEVENT_RECORD event, PCWSTR name, std::wstring& va
     return false;
 }
 
+// ── ETW event callback ─────────────────────────────────────────────────────
+
 static void WINAPI EventRecordCallback(PEVENT_RECORD event)
 {
     if (!g_running.load() || !g_callback)
@@ -163,7 +223,69 @@ static void WINAPI EventRecordCallback(PEVENT_RECORD event)
         GetPropertyString(event, L"ImageFileName", payload.imagePath);
 
     g_callback(payload);
+
+    // ── Injection detection logic ──────────────────────────────────────
+    // During the baseline phase (first 5 s) we record what each PID loads
+    // at startup.  After that, any DLL loaded from a non-trusted path that
+    // hasn't been seen before is flagged as suspicious.
+    // ────────────────────────────────────────────────────────────────────
+
+    {
+        std::lock_guard<std::mutex> lk(g_detectionMutex);
+
+        ULONGLONG now = GetTickCount64();
+        if (g_baselinePhase && (now - g_sessionStartTick > 5000))
+            g_baselinePhase = false;
+
+        std::wstring lowerPath = payload.imagePath;
+        std::transform(lowerPath.begin(), lowerPath.end(), lowerPath.begin(), ::towlower);
+
+        if (g_baselinePhase)
+        {
+            // Record baseline DLLs per process
+            g_processBaseline[payload.processId].insert(lowerPath);
+            return;
+        }
+
+        // Skip if this DLL was already in the baseline for this PID
+        auto it = g_processBaseline.find(payload.processId);
+        if (it != g_processBaseline.end() && it->second.count(lowerPath))
+            return;
+
+        // Add to known set so we only alert once
+        g_processBaseline[payload.processId].insert(lowerPath);
+
+        // Check if the path is non-trusted (suspicious)
+        if (!IsTrustedPath(payload.imagePath))
+        {
+            // This is a DLL loaded from a non-standard location — flag it
+            if (g_alertCallback)
+            {
+                InjectionAlertEvent alert;
+                alert.sourcePid = 0;  // ETW image-load doesn't tell us who called LoadLibrary
+                alert.targetPid = payload.processId;
+                alert.dllPath   = payload.imagePath;
+                alert.technique = "LoadLibrary";
+                alert.severity  = "High";
+
+                // Check for known malicious DLL names
+                std::wstring filename = GetFilenameFromPath(lowerPath);
+                if (filename.find(L"malicious") != std::wstring::npos ||
+                    filename.find(L"inject")    != std::wstring::npos ||
+                    filename.find(L"evil")      != std::wstring::npos ||
+                    filename.find(L"payload")   != std::wstring::npos ||
+                    filename.find(L"hook")      != std::wstring::npos)
+                {
+                    alert.severity = "Critical";
+                }
+
+                g_alertCallback(alert);
+            }
+        }
+    }
 }
+
+// ── Session management ──────────────────────────────────────────────────────
 
 bool StartEtwSession(ImageLoadCallback callback)
 {
@@ -171,6 +293,8 @@ bool StartEtwSession(ImageLoadCallback callback)
         return false;
 
     g_callback = std::move(callback);
+    g_sessionStartTick = GetTickCount64();
+    g_baselinePhase = true;
 
     const ULONG propertiesSize = sizeof(EVENT_TRACE_PROPERTIES) + (MAX_PATH * sizeof(wchar_t));
     g_properties = reinterpret_cast<EVENT_TRACE_PROPERTIES*>(calloc(1, propertiesSize));
@@ -184,7 +308,7 @@ bool StartEtwSession(ImageLoadCallback callback)
     g_properties->Wnode.Flags = WNODE_FLAG_TRACED_GUID;
     g_properties->Wnode.Guid = SystemTraceControlGuid;
     g_properties->LogFileMode = EVENT_TRACE_REAL_TIME_MODE;
-    g_properties->EnableFlags = EVENT_TRACE_FLAG_IMAGE_LOAD;
+    g_properties->EnableFlags = EVENT_TRACE_FLAG_IMAGE_LOAD | EVENT_TRACE_FLAG_PROCESS;
     g_properties->LoggerNameOffset = sizeof(EVENT_TRACE_PROPERTIES);
 
     ULONG status = StartTrace(&g_sessionHandle, KERNEL_LOGGER_NAME, g_properties);
@@ -239,5 +363,11 @@ void StopEtwSession()
     {
         free(g_properties);
         g_properties = nullptr;
+    }
+
+    // Clear detection state  
+    {
+        std::lock_guard<std::mutex> lk(g_detectionMutex);
+        g_processBaseline.clear();
     }
 }
