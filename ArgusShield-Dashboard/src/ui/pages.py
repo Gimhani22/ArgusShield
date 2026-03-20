@@ -6,7 +6,10 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPainter, QColor, QPen, QFont
-from ui.styles import CONTENT_BOX_STYLE, INNER_BOX_STYLE, TABLE_STYLE
+from ui.styles import (
+    CONTENT_BOX_STYLE, INNER_BOX_STYLE, TABLE_STYLE,
+    STATUS_BANNER_PROTECTED, STATUS_BANNER_ALERT,
+)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -18,7 +21,7 @@ def make_inner_box(title=''):
     box = QGroupBox(title)
     box.setStyleSheet(INNER_BOX_STYLE)
     lyt = QVBoxLayout()
-    lyt.setContentsMargins(12, 16, 12, 12)
+    lyt.setContentsMargins(12, 20, 12, 12)
     lyt.setSpacing(6)
     box.setLayout(lyt)
     return box
@@ -34,6 +37,7 @@ class BarChartWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setMinimumHeight(200)
+        self.setAttribute(Qt.WA_OpaquePaintEvent, False)
         self._data = []
         self._title = ''
         self._bar_color = QColor('#2d8cff')
@@ -57,8 +61,8 @@ class BarChartWidget(QWidget):
         chart_h = h - pad_t - pad_b
         max_val  = max(v for _, v in self._data) or 1
 
-        # Background matches inner box
-        painter.fillRect(0, 0, w, h, QColor('#1e1e1e'))
+        # Use transparent background — inherits parent container color
+        painter.fillRect(0, 0, w, h, QColor(0, 0, 0, 0))
 
         # Title
         if self._title:
@@ -111,7 +115,7 @@ class StatCard(QWidget):
     def __init__(self, title, value, color='#2d8cff'):
         super().__init__()
         self.setStyleSheet(f"""
-            QWidget {{
+            StatCard {{
                 background-color: #1e1e1e;
                 border-radius: 8px;
                 border-left: 3px solid {color};
@@ -124,17 +128,53 @@ class StatCard(QWidget):
 
         title_lbl = QLabel(title.upper())
         title_lbl.setStyleSheet('font-size: 11px; color: #666; font-weight: bold; '
-                                'letter-spacing: 1px; border: none;')
+                                'letter-spacing: 1px; background: transparent; border: none;')
 
         self.value_lbl = QLabel(str(value))
         self.value_lbl.setStyleSheet(f'font-size: 26px; font-weight: bold; '
-                                     f'color: {color}; border: none;')
+                                     f'color: {color}; background: transparent; border: none;')
 
         layout.addWidget(title_lbl)
         layout.addWidget(self.value_lbl)
 
     def set_value(self, v):
         self.value_lbl.setText(str(v))
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  Feature card (for About page)
+# ──────────────────────────────────────────────────────────────────────────────
+
+class FeatureCard(QWidget):
+    def __init__(self, icon_char, title, desc, color='#2d8cff'):
+        super().__init__()
+        self.setStyleSheet(f"""
+            FeatureCard {{
+                background-color: #1e1e1e;
+                border-radius: 8px;
+                border-top: 3px solid {color};
+            }}
+        """)
+        self.setMinimumHeight(120)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(16, 14, 16, 14)
+        layout.setSpacing(6)
+
+        icon_lbl = QLabel(icon_char)
+        icon_lbl.setStyleSheet(f'font-size: 28px; color: {color}; background: transparent;')
+
+        title_lbl = QLabel(title)
+        title_lbl.setStyleSheet('font-size: 14px; font-weight: bold; color: #eee; background: transparent;')
+
+        desc_lbl = QLabel(desc)
+        desc_lbl.setWordWrap(True)
+        desc_lbl.setStyleSheet('font-size: 12px; color: #888; background: transparent;')
+
+        layout.addWidget(icon_lbl)
+        layout.addWidget(title_lbl)
+        layout.addWidget(desc_lbl)
+        layout.addStretch()
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -147,7 +187,6 @@ class DashboardPage(QWidget):
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
 
-        # Outer content box  ← uses CONTENT_BOX_STYLE (#222)
         box = QWidget()
         box.setStyleSheet(CONTENT_BOX_STYLE)
         box.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
@@ -169,29 +208,21 @@ class DashboardPage(QWidget):
 
         # Header
         header = QLabel('Dashboard')
-        header.setStyleSheet('font-size: 28px; font-weight: bold; color: #fff;')
+        header.setStyleSheet('font-size: 28px; font-weight: bold; color: #fff; background: transparent;')
         sub = QLabel('ArgusShield Security Overview')
-        sub.setStyleSheet('font-size: 13px; color: #666;')
+        sub.setStyleSheet('font-size: 13px; color: #666; background: transparent;')
         layout.addWidget(header)
         layout.addWidget(sub)
 
         # Status banner
-        self.status_banner = QLabel('Protection Active  —  System is Secure')
+        self.status_banner = QLabel('🛡  Protection Active  —  System is Secure')
         self.status_banner.setAlignment(Qt.AlignCenter)
-        self.status_banner.setStyleSheet("""
-            background-color: #152a1e;
-            color: #27ae60;
-            font-size: 14px;
-            font-weight: bold;
-            border: 1px solid #27ae60;
-            border-radius: 6px;
-            padding: 10px;
-        """)
+        self.status_banner.setStyleSheet(STATUS_BANNER_PROTECTED)
         layout.addWidget(self.status_banner)
 
         # Stat cards
         cards_row = QHBoxLayout()
-        cards_row.setSpacing(10)
+        cards_row.setSpacing(12)
         self.card_total  = StatCard('Total Attacks Blocked', '1,284', '#e74c3c')
         self.card_today  = StatCard('Blocked Today',          '17',    '#f39c12')
         self.card_dll    = StatCard('DLL Injection Stopped',  '342',   '#9b59b6')
@@ -202,7 +233,7 @@ class DashboardPage(QWidget):
 
         # Charts row
         charts_row = QHBoxLayout()
-        charts_row.setSpacing(10)
+        charts_row.setSpacing(12)
 
         weekly_chart = BarChartWidget()
         weekly_chart.setMinimumHeight(210)
@@ -235,7 +266,7 @@ class DashboardPage(QWidget):
         recent_table.setEditTriggers(QTableWidget.NoEditTriggers)
         recent_table.setSelectionBehavior(QTableWidget.SelectRows)
         recent_table.setAlternatingRowColors(True)
-        recent_table.setMaximumHeight(175)
+        recent_table.setMaximumHeight(200)
         recent_table.setStyleSheet(TABLE_STYLE)
 
         rows = [
@@ -247,6 +278,7 @@ class DashboardPage(QWidget):
         ]
         recent_table.setRowCount(len(rows))
         for r, (t, proc, atype, status) in enumerate(rows):
+            recent_table.setRowHeight(r, 36)
             for c, val in enumerate((t, proc, atype, status)):
                 item = QTableWidgetItem(val)
                 item.setTextAlignment(Qt.AlignCenter)
@@ -260,7 +292,7 @@ class DashboardPage(QWidget):
         # System info
         info_box = make_inner_box('System Information')
         info_grid = QGridLayout()
-        info_grid.setSpacing(8)
+        info_grid.setSpacing(10)
         infos = [
             ('Driver Status',    'Loaded and Active'),
             ('Monitor Mode',     'Real-time'),
@@ -271,9 +303,9 @@ class DashboardPage(QWidget):
         ]
         for row, (k, v) in enumerate(infos):
             k_lbl = QLabel(k + ':')
-            k_lbl.setStyleSheet('color: #666; font-size: 13px;')
+            k_lbl.setStyleSheet('color: #666; font-size: 13px; background: transparent;')
             v_lbl = QLabel(v)
-            v_lbl.setStyleSheet('color: #ddd; font-size: 13px; font-weight: bold;')
+            v_lbl.setStyleSheet('color: #ddd; font-size: 13px; font-weight: bold; background: transparent;')
             info_grid.addWidget(k_lbl, row, 0)
             info_grid.addWidget(v_lbl, row, 1)
         info_box.layout().addLayout(info_grid)
@@ -315,7 +347,6 @@ class QuarantinePage(QWidget):
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
 
-        # Outer content box  ← uses CONTENT_BOX_STYLE (#222)
         box = QWidget()
         box.setStyleSheet(CONTENT_BOX_STYLE)
         box.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
@@ -339,9 +370,9 @@ class QuarantinePage(QWidget):
         h_row = QHBoxLayout()
         title_col = QVBoxLayout()
         header = QLabel('Quarantine')
-        header.setStyleSheet('font-size: 28px; font-weight: bold; color: #fff;')
+        header.setStyleSheet('font-size: 28px; font-weight: bold; color: #fff; background: transparent;')
         sub = QLabel('Attacks detected and blocked by ArgusShield')
-        sub.setStyleSheet('font-size: 13px; color: #666;')
+        sub.setStyleSheet('font-size: 13px; color: #666; background: transparent;')
         title_col.addWidget(header)
         title_col.addWidget(sub)
         h_row.addLayout(title_col)
@@ -380,7 +411,7 @@ class QuarantinePage(QWidget):
 
         # Summary stat cards
         cards_row = QHBoxLayout()
-        cards_row.setSpacing(10)
+        cards_row.setSpacing(12)
         self.card_total    = StatCard('Total Quarantined', str(len(SAMPLE_ATTACKS)), '#e74c3c')
         self.card_critical = StatCard('Critical',          '3',  '#e74c3c')
         self.card_high     = StatCard('High',              '4',  '#e67e22')
@@ -393,7 +424,7 @@ class QuarantinePage(QWidget):
 
         # Charts
         charts_row = QHBoxLayout()
-        charts_row.setSpacing(10)
+        charts_row.setSpacing(12)
 
         weekly_chart = BarChartWidget()
         weekly_chart.set_data(
@@ -435,6 +466,7 @@ class QuarantinePage(QWidget):
     def _populate_table(self, data):
         self.table.setRowCount(len(data))
         for row, cols in enumerate(data):
+            self.table.setRowHeight(row, 36)
             for col, val in enumerate(cols):
                 item = QTableWidgetItem(val)
                 item.setTextAlignment(Qt.AlignCenter)
@@ -443,6 +475,25 @@ class QuarantinePage(QWidget):
                 if col == 5:
                     item.setForeground(QColor('#e74c3c'))
                 self.table.setItem(row, col, item)
+
+    def add_detection(self, timestamp, process, source, attack_type, severity, status):
+        """Add a live detection row to the quarantine table (called from pipe listener)."""
+        row = 0  # insert at top
+        self.table.insertRow(row)
+        self.table.setRowHeight(row, 36)
+        vals = (timestamp, process, source, attack_type, severity, status)
+        for col, val in enumerate(vals):
+            item = QTableWidgetItem(val)
+            item.setTextAlignment(Qt.AlignCenter)
+            if col == 4:
+                item.setForeground(QColor(SEVERITY_COLORS.get(val, '#ddd')))
+            if col == 5:
+                item.setForeground(QColor('#e74c3c'))
+            self.table.setItem(row, col, item)
+
+        # Update card counts
+        total = self.table.rowCount()
+        self.card_total.set_value(str(total))
 
     def clear_log(self):
         self.table.setRowCount(0)
@@ -468,11 +519,11 @@ class ToggleRow(QWidget):
 
         text_col = QVBoxLayout()
         lbl = QLabel(label)
-        lbl.setStyleSheet('font-size: 13px; color: #ddd; font-weight: bold;')
+        lbl.setStyleSheet('font-size: 13px; color: #ddd; font-weight: bold; background: transparent;')
         text_col.addWidget(lbl)
         if description:
             desc = QLabel(description)
-            desc.setStyleSheet('font-size: 11px; color: #555;')
+            desc.setStyleSheet('font-size: 11px; color: #555; background: transparent;')
             text_col.addWidget(desc)
 
         self.checkbox = QCheckBox()
@@ -505,7 +556,6 @@ class SettingsPage(QWidget):
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
 
-        # Outer content box  ← uses CONTENT_BOX_STYLE (#222)
         box = QWidget()
         box.setStyleSheet(CONTENT_BOX_STYLE)
         box.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
@@ -527,9 +577,9 @@ class SettingsPage(QWidget):
 
         # Header
         header = QLabel('Settings')
-        header.setStyleSheet('font-size: 28px; font-weight: bold; color: #fff;')
+        header.setStyleSheet('font-size: 28px; font-weight: bold; color: #fff; background: transparent;')
         sub = QLabel('Configure ArgusShield protection and behavior')
-        sub.setStyleSheet('font-size: 13px; color: #666;')
+        sub.setStyleSheet('font-size: 13px; color: #666; background: transparent;')
         layout.addWidget(header)
         layout.addWidget(sub)
 
@@ -554,7 +604,7 @@ class SettingsPage(QWidget):
         sb = scan_box.layout()
 
         sched_lbl = QLabel('Scan Schedule')
-        sched_lbl.setStyleSheet('font-size: 13px; color: #888;')
+        sched_lbl.setStyleSheet('font-size: 13px; color: #888; background: transparent;')
         sb.addWidget(sched_lbl)
 
         sched_combo = QComboBox()
@@ -608,7 +658,7 @@ class SettingsPage(QWidget):
 
         log_path_row = QHBoxLayout()
         log_dir_lbl = QLabel('Log Directory')
-        log_dir_lbl.setStyleSheet('font-size: 13px; color: #888; min-width: 90px;')
+        log_dir_lbl.setStyleSheet('font-size: 13px; color: #888; min-width: 90px; background: transparent;')
         self.log_path_edit = QLineEdit(r'C:\ProgramData\ArgusShield\Logs')
         self.log_path_edit.setStyleSheet("""
             QLineEdit {
@@ -671,43 +721,110 @@ class SettingsPage(QWidget):
         QMessageBox.information(self, 'Settings', 'Settings saved successfully.')
 
 # ──────────────────────────────────────────────────────────────────────────────
-#  5. ABOUT PAGE  (unchanged)
+#  4. ABOUT PAGE
 # ──────────────────────────────────────────────────────────────────────────────
 
 class AboutPage(QWidget):
     def __init__(self):
         super().__init__()
-        layout = QVBoxLayout(self)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+
         box = QWidget()
-        box_layout = QVBoxLayout()
-        box.setLayout(box_layout)
         box.setStyleSheet(CONTENT_BOX_STYLE)
         box.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        outer.addWidget(box)
 
-        label = QLabel('ArgusShield')
-        label.setAlignment(Qt.AlignCenter)
-        label.setStyleSheet('font-size: 48px; font-weight: bold; color: #2d8cff;')
-        box_layout.addWidget(label)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setStyleSheet('QScrollArea { border: none; background: transparent; }')
+        box_layout = QVBoxLayout(box)
+        box_layout.setContentsMargins(0, 0, 0, 0)
+        box_layout.addWidget(scroll)
+
+        container = QWidget()
+        container.setStyleSheet('background: transparent;')
+        scroll.setWidget(container)
+        layout = QVBoxLayout(container)
+        layout.setSpacing(16)
+        layout.setContentsMargins(14, 14, 14, 14)
+
+        # Hero section
+        hero_box = make_inner_box()
+        hero_lyt = hero_box.layout()
+        hero_lyt.setAlignment(Qt.AlignCenter)
+
+        logo = QLabel('🛡')
+        logo.setAlignment(Qt.AlignCenter)
+        logo.setStyleSheet('font-size: 56px; background: transparent;')
+        hero_lyt.addWidget(logo)
+
+        title = QLabel('ArgusShield')
+        title.setAlignment(Qt.AlignCenter)
+        title.setStyleSheet('font-size: 42px; font-weight: bold; color: #2d8cff; background: transparent;')
+        hero_lyt.addWidget(title)
 
         version = QLabel('Version 1.0.0')
         version.setAlignment(Qt.AlignCenter)
-        version.setStyleSheet('font-size: 22px; color: #555; margin-bottom: 30px;')
-        box_layout.addWidget(version)
+        version.setStyleSheet('font-size: 18px; color: #555; background: transparent;')
+        hero_lyt.addWidget(version)
 
-        about_text = QLabel(
-            "ArgusShield is a professional-grade security solution designed to protect "
-            "your system from advanced threats.\n\n"
-            "Key Features:\n"
-            "  Real-time DLL Injection Protection\n"
-            "  Process Monitoring and Behavioral Analysis\n"
-            "  Stealth Operation Mode\n"
-            "  Minimal System Resource Usage\n\n"
-            "Developed by ArgusShield."
+        tagline = QLabel('Professional-Grade Security Against Advanced Injection Attacks')
+        tagline.setAlignment(Qt.AlignCenter)
+        tagline.setWordWrap(True)
+        tagline.setStyleSheet('font-size: 14px; color: #888; margin-top: 8px; background: transparent;')
+        hero_lyt.addWidget(tagline)
+
+        layout.addWidget(hero_box)
+
+        # Feature cards grid
+        features_label = QLabel('Key Features')
+        features_label.setStyleSheet('font-size: 20px; font-weight: bold; color: #ddd; background: transparent;')
+        layout.addWidget(features_label)
+
+        features_row1 = QHBoxLayout()
+        features_row1.setSpacing(12)
+        features_row1.addWidget(FeatureCard(
+            '🔍', 'Real-time DLL Protection',
+            'Monitor and block DLL injection attacks as they happen using ETW tracing.',
+            '#e74c3c'))
+        features_row1.addWidget(FeatureCard(
+            '🖥', 'Process Monitoring',
+            'Behavioral analysis of running processes to detect suspicious activity.',
+            '#f39c12'))
+        features_row1.addWidget(FeatureCard(
+            '🔒', 'Kernel Exploit Guard',
+            'Protection against kernel-level exploits targeting the Windows OS.',
+            '#9b59b6'))
+        layout.addLayout(features_row1)
+
+        features_row2 = QHBoxLayout()
+        features_row2.setSpacing(12)
+        features_row2.addWidget(FeatureCard(
+            '👁', 'Stealth Operation',
+            'Run without visible process indicators for covert security monitoring.',
+            '#2d8cff'))
+        features_row2.addWidget(FeatureCard(
+            '⚡', 'Minimal Resources',
+            'Lightweight background service with minimal CPU and memory footprint.',
+            '#27ae60'))
+        features_row2.addWidget(FeatureCard(
+            '🔔', 'Instant Alerts',
+            'System tray notifications and desktop alerts for real-time threat reporting.',
+            '#e67e22'))
+        layout.addLayout(features_row2)
+
+        # Credits
+        credits_box = make_inner_box('Credits')
+        credits_lyt = credits_box.layout()
+        credits_text = QLabel(
+            'Developed as a Final Year Project by ArgusShield.\n'
+            'Built with ETW (Event Tracing for Windows), C++ Windows Services, and PyQt5.\n'
+            'MITRE ATT&CK Framework: T1055.001 (Process Injection: DLL Injection)'
         )
-        about_text.setAlignment(Qt.AlignCenter)
-        about_text.setWordWrap(True)
-        about_text.setStyleSheet('font-size: 18px; line-height: 1.6; color: #ccc; padding: 20px;')
-        box_layout.addWidget(about_text)
+        credits_text.setWordWrap(True)
+        credits_text.setStyleSheet('font-size: 13px; color: #888; line-height: 1.6; background: transparent;')
+        credits_lyt.addWidget(credits_text)
+        layout.addWidget(credits_box)
 
-        box_layout.addStretch()
-        layout.addWidget(box)
+        layout.addStretch()
