@@ -1,8 +1,9 @@
 # -*- mode: python ; coding: utf-8 -*-
 import os
 
-# Path to the bin folder containing the background service
-# SPECPATH is the directory containing this spec file (ArgusShield-Dashboard)
+# Path to the bin folder containing the background service and agent.
+# Before building, copy both ArgusShieldService.exe and ArgusShieldAgent.exe
+# into this folder.  SPECPATH is the directory containing this spec file.
 bin_folder = os.path.join(SPECPATH, 'bin')
 
 a = Analysis(
@@ -10,7 +11,7 @@ a = Analysis(
     pathex=[],
     binaries=[],
     datas=[
-        # Include the bin folder with ArgusShieldService.exe
+        # Include the bin folder with ArgusShieldService.exe + ArgusShieldAgent.exe
         (bin_folder, 'bin'),
     ],
     hiddenimports=[],
