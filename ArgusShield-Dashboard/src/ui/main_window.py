@@ -357,6 +357,7 @@ class MainWindow(QMainWindow):
         if agent_path:
             cmd = (f'sc create ArgusShieldAgent '
                    f'binPath= "{agent_path}" start= auto '
+                   f'depend= ArgusShieldService '
                    f'DisplayName= "ArgusShield Agent"')
             ok, out = self._run_command(cmd)
             # Not fatal if agent install fails
