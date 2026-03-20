@@ -42,12 +42,26 @@ static const int THRESHOLD_IGNORE = 30;   // Score < 30 → Ignore
 static const int THRESHOLD_ALERT  = 70;   // Score 30–70 → Alert only
                                           // Score > 70 → Block
 
-// ── Known system processes (critical — not to be terminated) ────────────────
+// ── Known system/safe processes (will get negative score, never blocked) ─────
 static const std::unordered_set<std::string> g_CriticalSystemProcesses = {
+    // Windows core
     "system", "smss.exe", "csrss.exe", "wininit.exe", "winlogon.exe",
     "services.exe", "lsass.exe", "svchost.exe", "dwm.exe",
     "taskhostw.exe", "runtimebroker.exe", "searchindexer.exe",
-    "securityhealthservice.exe",
+    "securityhealthservice.exe", "msmpeng.exe", "nissrv.exe",
+    // Windows shell & UI
+    "explorer.exe", "sihost.exe", "fontdrvhost.exe", "ctfmon.exe",
+    "conhost.exe", "applicationframehost.exe", "shellexperiencehost.exe",
+    "startmenuexperiencehost.exe", "searchui.exe", "searchapp.exe",
+    "textinputhost.exe", "dllhost.exe", "taskmgr.exe", "mmc.exe",
+    // Windows services & tools
+    "spoolsv.exe", "lsm.exe", "wuauclt.exe", "audiodg.exe",
+    "wmiprvse.exe", "wmi.exe", "trustedinstaller.exe",
+    "tiworker.exe", "msiexec.exe", "consent.exe",
+    "smartscreen.exe", "sgrmbroker.exe", "registry.exe",
+    "dashost.exe", "devicecensus.exe", "compattelrunner.exe",
+    "musnotification.exe", "backgroundtaskhost.exe",
+    // ArgusShield
     "argusshieldservice.exe", "argusshieldagent.exe"
 };
 
@@ -58,31 +72,66 @@ static const std::unordered_set<std::string> g_HighRiskTargets = {
 };
 
 static const std::unordered_set<std::string> g_MediumRiskTargets = {
-    "explorer.exe", "svchost.exe", "dwm.exe", "taskhostw.exe",
+    "svchost.exe", "dwm.exe", "taskhostw.exe",
     "runtimebroker.exe"
 };
 
 // ── Trusted publishers (code signing) ───────────────────────────────────────
 static const std::unordered_set<std::string> g_TrustedPublishers = {
     "microsoft corporation", "microsoft windows",
+    "microsoft windows hardware compatibility publisher",
+    "microsoft windows publisher",
     "google llc", "google inc",
-    "mozilla corporation",
+    "mozilla corporation", "mozilla foundation",
     "adobe inc.", "adobe systems incorporated",
-    "oracle corporation",
+    "oracle corporation", "oracle america, inc.",
     "apple inc.",
     "nvidia corporation",
-    "intel corporation",
-    "slack technologies, inc.",
+    "intel corporation", "intel(r) software development products",
+    "amd", "advanced micro devices, inc.",
+    "dell inc.", "dell technologies inc.",
+    "hp inc.", "hewlett-packard company",
+    "lenovo", "lenovo (beijing) limited",
+    "samsung electronics co., ltd.",
+    "logitech", "logitech inc",
+    "realtek semiconductor corp.",
+    "broadcom corporation", "broadcom inc.",
+    "slack technologies, inc.", "slack technologies, llc",
     "valve corp.",
-    "jetbrains s.r.o."
+    "jetbrains s.r.o.",
+    "zoom video communications, inc.",
+    "discord inc.",
+    "spotify ab",
+    "dropbox, inc.",
+    "github, inc.",
+    "1password",
+    "nordvpn s.a.",
+    "symantec corporation", "norton lifelock inc.",
+    "mcafee, llc", "mcafee, inc.",
+    "malwarebytes inc.", "malwarebytes corporation",
+    "avast software s.r.o.",
+    "eset, spol. s r.o.",
+    "kaspersky lab",
+    "bitdefender srl",
+    "trend micro, inc.",
 };
 
-// ── Known safe debuggers/tools (get a big negative score) ───────────────────
+// ── Known safe tools (debuggers, browsers, AV, accessibility — negative score)
 static const std::unordered_set<std::string> g_SafeDebuggers = {
+    // Debuggers & dev tools
     "devenv.exe", "msvsmon.exe", "windbg.exe", "windbgx.exe",
     "x64dbg.exe", "x32dbg.exe", "ollydbg.exe", "ida.exe", "ida64.exe",
     "vscode.exe", "code.exe",
-    "msbuild.exe", "vstest.console.exe"
+    "msbuild.exe", "vstest.console.exe", "dotnet.exe",
+    // Browsers (perform cross-process operations for rendering)
+    "chrome.exe", "msedge.exe", "firefox.exe", "opera.exe", "brave.exe",
+    // Common apps that do cross-process work
+    "teams.exe", "slack.exe", "discord.exe", "zoom.exe",
+    "spotify.exe", "steam.exe", "epicgameslauncher.exe",
+    // Accessibility & input
+    "osk.exe", "magnify.exe", "narrator.exe",
+    // AV / security tools (they inject for protection)
+    "msmpeng.exe", "mpcmdrun.exe", "securityhealthsystray.exe",
 };
 
 // ── Suspicious parent-child pairs ───────────────────────────────────────────
@@ -784,19 +833,8 @@ static void ProcessLine(const std::string& line)
                 dllPath, technique, severity,
                 action, details);
 
-            // Still forward to Dashboard for visibility
-            std::ostringstream dashMsg;
-            dashMsg << "InjectionAlert"
-                    << "|source_pid=" << sourcePid
-                    << "|target_pid=" << targetPid
-                    << "|dll_path=" << dllPath
-                    << "|technique=" << technique
-                    << "|severity=" << severity
-                    << "|action=Allowed"
-                    << "|score=" << score.total
-                    << "|decision=Ignore"
-                    << "\n";
-            SendToDashboard(dashMsg.str());
+            // Do NOT forward Ignore events to Dashboard — reduces overhead
+            // and prevents unnecessary notifications for legitimate activity
             return;
         }
         else if (score.total <= THRESHOLD_ALERT)
