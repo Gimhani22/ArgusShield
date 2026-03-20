@@ -69,6 +69,25 @@ static std::string WideToUtf8(const std::wstring& text)
 
 static DWORD WINAPI EtwThread(LPVOID)
 {
+    // Register the injection alert callback so detected injections
+    // are sent to connected Agent clients via the named pipe.
+    SetInjectionAlertCallback([](const InjectionAlertEvent& alert)
+    {
+        std::ostringstream line;
+        line << "InjectionAlert"
+             << "|target_pid=" << alert.targetPid
+             << "|dll_path=" << WideToUtf8(alert.dllPath)
+             << "|technique=" << alert.technique
+             << "|severity=" << alert.severity
+             << "\n";
+
+        g_PipeServer.Send(line.str());
+
+        WriteLog("ALERT: Injection detected — PID " + std::to_string(alert.targetPid)
+                 + " loaded " + WideToUtf8(alert.dllPath)
+                 + " [" + alert.severity + "]");
+    });
+
     StartEtwSession([](const ImageLoadEvent& evt)
     {
         std::ostringstream line;
