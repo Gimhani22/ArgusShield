@@ -75,9 +75,10 @@ Section "MainSection" SEC01
     ; Copy icon if exists
     File /nonfatal "..\dist\icon.ico"
     
-    ; Create bin folder and copy service executable
+    ; Create bin folder and copy service + agent executables
     SetOutPath "$INSTDIR\bin"
     File "..\bin\ArgusShieldService.exe"
+    File "..\bin\ArgusShieldAgent.exe"
     SetOutPath "$INSTDIR"
     
     ; Create Start Menu shortcuts
@@ -117,7 +118,12 @@ FunctionEnd
 ;--------------------------------
 ; Uninstaller Section
 Section Uninstall
-    ; Stop and remove the Windows service first
+    ; Stop and remove the Agent service first (depends on Service)
+    nsExec::ExecToLog 'sc stop ArgusShieldAgent'
+    Sleep 1000
+    nsExec::ExecToLog 'sc delete ArgusShieldAgent'
+
+    ; Stop and remove the ETW service
     nsExec::ExecToLog 'sc stop ArgusShieldService'
     Sleep 2000
     nsExec::ExecToLog 'sc delete ArgusShieldService'
@@ -129,6 +135,7 @@ Section Uninstall
     Delete "$INSTDIR\ArgusShield.exe"
     Delete "$INSTDIR\icon.ico"
     Delete "$INSTDIR\bin\ArgusShieldService.exe"
+    Delete "$INSTDIR\bin\ArgusShieldAgent.exe"
     RMDir "$INSTDIR\bin"
     Delete "$INSTDIR\uninst.exe"
     RMDir "$INSTDIR"

@@ -189,6 +189,15 @@ if (Test-Path $ServiceExePath) {
     Write-Host "  Make sure to build the service project first!" -ForegroundColor Yellow
 }
 
+$AgentExePath = Join-Path $ServiceDir "ArgusShieldAgent\x64\Debug\ArgusShieldAgent.exe"
+if (Test-Path $AgentExePath) {
+    Copy-Item $AgentExePath -Destination $BinDir -Force
+    Write-Host "  Copied ArgusShieldAgent.exe to bin folder" -ForegroundColor Gray
+} else {
+    Write-Host "  WARNING: ArgusShieldAgent.exe not found at: $AgentExePath" -ForegroundColor Yellow
+    Write-Host "  Make sure to build the agent project first!" -ForegroundColor Yellow
+}
+
 Write-Host ""
 
 # Step 1: Build Python executable with PyInstaller
