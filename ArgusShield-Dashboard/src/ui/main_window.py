@@ -224,14 +224,21 @@ class MainWindow(QMainWindow):
         severity  = data.get('severity', 'High')
         technique = data.get('technique', 'DLL Injection')
         action    = data.get('action', 'Blocked')
+        score     = data.get('score', '?')
+        decision  = data.get('decision', '')
 
-        self.tray_icon.showMessage(
-            f'⚠ Injection {action} [{severity}]',
-            f'{technique} detected!\nPID: {pid}\nDLL: {dll_path}',
-            QSystemTrayIcon.Critical, 5000,
-        )
+        # Only show tray notification for BLOCKED threats
+        if action in ('Blocked', 'DetectedOnly'):
+            self.tray_icon.showMessage(
+                '🛡️ Blocked by ArgusShield',
+                f'{technique} injection blocked!\n'
+                f'Target PID: {pid}\n'
+                f'DLL: {dll_path}\n'
+                f'Severity: {severity} | Score: {score}',
+                QSystemTrayIcon.Critical, 5000,
+            )
 
-        # Trigger an immediate data refresh
+        # Trigger an immediate data refresh for both Block and Alert
         import_events_from_log()
         self.page_dashboard.refresh_data()
         self.page_quarantine.refresh_data()
