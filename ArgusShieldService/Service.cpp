@@ -119,7 +119,9 @@ static DWORD WINAPI EtwThread(LPVOID)
              << "|source_pid=" << alert.sourcePid
              << "|target_pid=" << alert.targetPid
              << "|thread_id=" << alert.remoteThreadId
+             << "|parent_pid=" << alert.parentPid
              << "|dll_path=" << dllPathUtf8
+             << "|source_image=" << WideToUtf8(alert.sourceImagePath)
              << "|technique=" << alert.technique
              << "|severity=" << alert.severity
              << "\n";
