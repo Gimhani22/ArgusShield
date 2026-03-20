@@ -14,37 +14,38 @@ bool g_Running = true;
 HANDLE g_EtwThread = NULL;
 PipeServer g_PipeServer;
 
-// Returns C:\ProgramData\ArgusShield\service.log
-// Creates the folder if it does not exist.
-static std::wstring GetLogPath()
+// ── Paths ───────────────────────────────────────────────────────────────────
+
+static std::wstring g_DataDir;
+
+static void InitPaths()
 {
     wchar_t programData[MAX_PATH] = {};
     DWORD len = GetEnvironmentVariableW(L"ProgramData", programData, MAX_PATH);
     if (len == 0)
         wcscpy_s(programData, L"C:\\ProgramData");
 
-    std::wstring dir = std::wstring(programData) + L"\\ArgusShield";
-
-    // Create C:\ProgramData\ArgusShield if it doesn't already exist
-    CreateDirectoryW(dir.c_str(), NULL);
-
-    return dir + L"\\service.log";
+    g_DataDir = std::wstring(programData) + L"\\ArgusShield";
+    CreateDirectoryW(g_DataDir.c_str(), NULL);
 }
+
+// ── Timestamps ──────────────────────────────────────────────────────────────
 
 static std::string CurrentTimestamp()
 {
-    std::time_t now = std::time(nullptr);
-    char buf[32] = {};
-    struct tm tm_info;
-    localtime_s(&tm_info, &now);
-    std::strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", &tm_info);
+    SYSTEMTIME st;
+    GetLocalTime(&st);
+    char buf[32];
+    sprintf_s(buf, "%04d-%02d-%02d %02d:%02d:%02d",
+        st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond);
     return std::string(buf);
 }
 
+// ── Service log ─────────────────────────────────────────────────────────────
+
 void WriteLog(const std::string& message)
 {
-    static std::wstring logPath = GetLogPath();
-
+    std::wstring logPath = g_DataDir + L"\\service.log";
     std::ofstream log(logPath, std::ios::app);
     if (log.is_open())
     {
@@ -53,43 +54,88 @@ void WriteLog(const std::string& message)
     }
 }
 
+// ── Shared events database (events.log) ─────────────────────────────────────
+// Format: TIMESTAMP|COMPONENT|TYPE|PID|TARGET_PID|DLL_PATH|TECHNIQUE|SEVERITY|ACTION|DETAILS
+// Both Service and Agent append to this file.  Dashboard reads it.
+
+static void WriteEvent(
+    const std::string& component,
+    const std::string& type,
+    DWORD pid,
+    DWORD targetPid,
+    const std::string& dllPath,
+    const std::string& technique,
+    const std::string& severity,
+    const std::string& action,
+    const std::string& details)
+{
+    std::wstring eventsPath = g_DataDir + L"\\events.log";
+    std::ofstream f(eventsPath, std::ios::app);
+    if (f.is_open())
+    {
+        f << CurrentTimestamp() << "|"
+          << component << "|"
+          << type << "|"
+          << pid << "|"
+          << targetPid << "|"
+          << dllPath << "|"
+          << technique << "|"
+          << severity << "|"
+          << action << "|"
+          << details << std::endl;
+    }
+}
+
+// ── String helpers ──────────────────────────────────────────────────────────
+
 static std::string WideToUtf8(const std::wstring& text)
 {
-    if (text.empty())
-        return std::string();
-
+    if (text.empty()) return std::string();
     int needed = WideCharToMultiByte(CP_UTF8, 0, text.c_str(), -1, nullptr, 0, nullptr, nullptr);
-    if (needed <= 0)
-        return std::string();
-
+    if (needed <= 0) return std::string();
     std::string result(needed - 1, '\0');
     WideCharToMultiByte(CP_UTF8, 0, text.c_str(), -1, &result[0], needed, nullptr, nullptr);
     return result;
 }
 
+// ── ETW thread ──────────────────────────────────────────────────────────────
+
 static DWORD WINAPI EtwThread(LPVOID)
 {
-    // Register the injection alert callback so detected injections
-    // are sent to connected Agent clients via the named pipe.
+    // Register injection alert callback
     SetInjectionAlertCallback([](const InjectionAlertEvent& alert)
     {
+        std::string dllPathUtf8 = WideToUtf8(alert.dllPath);
+
+        // 1. Write to shared events database
+        WriteEvent("Service", "DETECTION",
+            alert.sourcePid, alert.targetPid,
+            dllPathUtf8, alert.technique, alert.severity,
+            "Detected", "Injection detected by ETW");
+
+        // 2. Send alert through pipe to Agent
         std::ostringstream line;
         line << "InjectionAlert"
+             << "|source_pid=" << alert.sourcePid
              << "|target_pid=" << alert.targetPid
-             << "|dll_path=" << WideToUtf8(alert.dllPath)
+             << "|thread_id=" << alert.remoteThreadId
+             << "|dll_path=" << dllPathUtf8
              << "|technique=" << alert.technique
              << "|severity=" << alert.severity
              << "\n";
-
         g_PipeServer.Send(line.str());
 
-        WriteLog("ALERT: Injection detected — PID " + std::to_string(alert.targetPid)
-                 + " loaded " + WideToUtf8(alert.dllPath)
-                 + " [" + alert.severity + "]");
+        // 3. Write to service log
+        WriteLog("ALERT: " + alert.severity + " — " + alert.technique
+                 + " injection detected. Source PID=" + std::to_string(alert.sourcePid)
+                 + " Target PID=" + std::to_string(alert.targetPid)
+                 + " DLL=" + dllPathUtf8);
     });
 
+    // Start the ETW session with 4 kernel providers (blocks until stopped)
     StartEtwSession([](const ImageLoadEvent& evt)
     {
+        // Forward all image-load events to the Agent via pipe
         std::ostringstream line;
         line << "ImageLoad"
              << "|pid=" << evt.processId
@@ -97,30 +143,31 @@ static DWORD WINAPI EtwThread(LPVOID)
              << "|size=" << std::dec << evt.imageSize
              << "|path=" << WideToUtf8(evt.imagePath)
              << "\n";
-
         g_PipeServer.Send(line.str());
     });
 
     return ERROR_SUCCESS;
 }
 
+// ── Service thread ──────────────────────────────────────────────────────────
+
 DWORD WINAPI ServiceThread(LPVOID lpParam)
 {
-    WriteLog("ArgusShield initialized");
+    WriteLog("ArgusShield Service initialized (4 kernel providers: Process, Thread, Image, Memory)");
 
     g_PipeServer.Start();
     g_EtwThread = CreateThread(nullptr, 0, EtwThread, nullptr, 0, nullptr);
 
     while (g_Running)
     {
-        Sleep(5000); // Sleep for 5 seconds
+        Sleep(5000);
     }
 
     StopEtwSession();
 
     if (g_EtwThread)
     {
-        WaitForSingleObject(g_EtwThread, INFINITE);
+        WaitForSingleObject(g_EtwThread, 5000);
         CloseHandle(g_EtwThread);
         g_EtwThread = NULL;
     }
@@ -130,6 +177,8 @@ DWORD WINAPI ServiceThread(LPVOID lpParam)
     WriteLog("ArgusShield Service stopped.");
     return ERROR_SUCCESS;
 }
+
+// ── Service control ─────────────────────────────────────────────────────────
 
 void WINAPI ServiceCtrlHandler(DWORD CtrlCode)
 {
@@ -174,6 +223,8 @@ void WINAPI ServiceMain(DWORD argc, LPWSTR* argv)
 
 int main()
 {
+    InitPaths();
+
     SERVICE_TABLE_ENTRY ServiceTable[] =
     {
         { (LPWSTR)L"ArgusShieldService", (LPSERVICE_MAIN_FUNCTION)ServiceMain },
@@ -181,6 +232,5 @@ int main()
     };
 
     StartServiceCtrlDispatcher(ServiceTable);
-
     return 0;
 }
