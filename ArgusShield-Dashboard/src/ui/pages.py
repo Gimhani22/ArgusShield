@@ -10,6 +10,7 @@ from ui.styles import (
     CONTENT_BOX_STYLE, INNER_BOX_STYLE, TABLE_STYLE,
     STATUS_BANNER_PROTECTED, STATUS_BANNER_ALERT,
 )
+from database import get_detection_stats, get_recent_detections, get_quarantine_entries
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -313,6 +314,41 @@ class DashboardPage(QWidget):
 
         layout.addStretch()
 
+        # Initial data load from database
+        self.recent_table = recent_table
+        self.refresh_data()
+
+    def refresh_data(self):
+        """Reload stat cards and recent table from the database."""
+        stats = get_detection_stats()
+        self.card_total.set_value(str(stats.get('blocked', 0)))
+        self.card_today.set_value(str(stats.get('today', 0)))
+        self.card_dll.set_value(str(stats.get('dll_injection', 0)))
+
+        # Update status banner
+        if stats.get('total', 0) > 0:
+            self.status_banner.setText(
+                f'🛡  Protection Active  —  {stats["blocked"]} attacks blocked')
+
+        # Refresh recent activity table
+        detections = get_recent_detections(5)
+        self.recent_table.setRowCount(len(detections))
+        for r, det in enumerate(detections):
+            self.recent_table.setRowHeight(r, 36)
+            vals = [
+                det.get('timestamp', ''),
+                f"PID {det.get('target_pid', '?')}",
+                det.get('technique', ''),
+                det.get('action', 'Detected'),
+            ]
+            for c, val in enumerate(vals):
+                item = QTableWidgetItem(str(val))
+                item.setTextAlignment(Qt.AlignCenter)
+                if c == 3:
+                    color = '#e74c3c' if val == 'Blocked' else '#f39c12'
+                    item.setForeground(QColor(color))
+                self.recent_table.setItem(r, c, item)
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 #  2. QUARANTINE PAGE
@@ -500,6 +536,42 @@ class QuarantinePage(QWidget):
         for c in (self.card_total, self.card_critical, self.card_high,
                   self.card_medium, self.card_low):
             c.set_value('0')
+
+    def refresh_data(self):
+        """Reload the quarantine table and stat cards from the database."""
+        entries = get_quarantine_entries(50)
+
+        self.table.setRowCount(len(entries))
+        severity_counts = {'Critical': 0, 'High': 0, 'Medium': 0, 'Low': 0}
+
+        for r, det in enumerate(entries):
+            self.table.setRowHeight(r, 36)
+            severity = det.get('severity', 'Medium')
+            severity_counts[severity] = severity_counts.get(severity, 0) + 1
+
+            vals = [
+                det.get('timestamp', ''),
+                f"PID {det.get('target_pid', '?')}",
+                det.get('dll_path', 'N/A'),
+                det.get('technique', 'Unknown'),
+                severity,
+                det.get('action', 'Detected'),
+            ]
+            for c, val in enumerate(vals):
+                item = QTableWidgetItem(str(val))
+                item.setTextAlignment(Qt.AlignCenter)
+                if c == 4:
+                    item.setForeground(QColor(SEVERITY_COLORS.get(val, '#ddd')))
+                if c == 5:
+                    color = '#e74c3c' if val == 'Blocked' else '#f39c12'
+                    item.setForeground(QColor(color))
+                self.table.setItem(r, c, item)
+
+        self.card_total.set_value(str(len(entries)))
+        self.card_critical.set_value(str(severity_counts.get('Critical', 0)))
+        self.card_high.set_value(str(severity_counts.get('High', 0)))
+        self.card_medium.set_value(str(severity_counts.get('Medium', 0)))
+        self.card_low.set_value(str(severity_counts.get('Low', 0)))
 
     def export_csv(self):
         from PyQt5.QtWidgets import QMessageBox

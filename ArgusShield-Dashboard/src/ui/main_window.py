@@ -28,19 +28,21 @@ from ui.styles import (
     UNINSTALL_BUTTON_STYLE,
 )
 from ui.pages import DashboardPage, QuarantinePage, SettingsPage, AboutPage
-from database import create_db, get_install_state, set_install_state
+from database import (
+    create_db, get_install_state, set_install_state,
+    import_events_from_log,
+)
 from pipe_listener import PipeListenerThread
 
 
 def _create_shield_icon():
-    """Generate a simple shield icon programmatically (no file needed)."""
+    """Generate a simple shield icon programmatically."""
     pix = QPixmap(64, 64)
-    pix.fill(QColor(0, 0, 0, 0))  # transparent
+    pix.fill(QColor(0, 0, 0, 0))
 
     p = QPainter(pix)
     p.setRenderHint(QPainter.Antialiasing)
 
-    # Shield body
     from PyQt5.QtGui import QPainterPath
     path = QPainterPath()
     path.moveTo(32, 4)
@@ -55,12 +57,10 @@ def _create_shield_icon():
     p.setPen(Qt.NoPen)
     p.drawPath(path)
 
-    # "A" letter
     p.setPen(QColor('#ffffff'))
     font = QFont('Segoe UI', 22, QFont.Bold)
     p.setFont(font)
     p.drawText(pix.rect(), Qt.AlignCenter, 'A')
-
     p.end()
     return QIcon(pix)
 
@@ -72,17 +72,14 @@ class MainWindow(QMainWindow):
         self.resize(1300, 800)
         self.center_on_screen()
 
-        # Ensure database exists and read persisted install state
         create_db()
         self.installed = get_install_state()
 
-        # Set theme
         self.setPalette(get_dark_palette())
         self.setStyleSheet(
             "QWidget { background-color: #181818; color: #fff; }\n" + GLOBAL_STYLE
         )
 
-        # App icon
         self._icon = _create_shield_icon()
         self.setWindowIcon(self._icon)
 
@@ -109,7 +106,7 @@ class MainWindow(QMainWindow):
         self.tray_icon.setToolTip('ArgusShield — Protection Active')
         self.tray_icon.show()
 
-        # ── Central widget and main layout ───────────────────────────────
+        # ── Central widget ───────────────────────────────────────────────
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         main_layout = QHBoxLayout()
@@ -124,7 +121,6 @@ class MainWindow(QMainWindow):
         sidebar_widget.setFixedWidth(260)
         sidebar_widget.setStyleSheet(SIDEBAR_STYLE)
 
-        # Navigation Buttons
         self.nav_buttons = []
         nav_items = [('Dashboard', 0), ('Quarantine', 1), ('Settings', 2), ('About', 3)]
 
@@ -150,11 +146,10 @@ class MainWindow(QMainWindow):
 
         main_layout.addWidget(sidebar_widget)
 
-        # Stacked widget for main content
+        # Stacked widget for pages
         self.stack = QStackedWidget()
         main_layout.addWidget(self.stack)
 
-        # Pages (order must match sidebar nav_items indices)
         self.page_dashboard  = DashboardPage()
         self.page_quarantine = QuarantinePage()
         self.page_settings   = SettingsPage()
@@ -165,29 +160,42 @@ class MainWindow(QMainWindow):
         self.stack.addWidget(self.page_settings)
         self.stack.addWidget(self.page_about)
 
-        # Sync install button with current state and show initial page
         self.sync_install_button()
         self.switch_page(0)
 
-        # ── Pipe listener (receives alerts from the Agent) ───────────────
+        # ── Pipe listener (real-time alerts from Agent) ──────────────────
         self._pipe_thread = PipeListenerThread(self)
         self._pipe_thread.alert_received.connect(self._on_injection_alert)
         self._pipe_thread.connection_changed.connect(self._on_agent_connection)
         self._pipe_thread.start()
+
+        # ── Periodic data refresh timer ──────────────────────────────────
+        # Reads events.log every 5 seconds and refreshes page data
+        self._refresh_timer = QTimer(self)
+        self._refresh_timer.timeout.connect(self._periodic_refresh)
+        self._refresh_timer.start(5000)
+
+    # ──────────────────────────────────────────────────────────────────────
+    #  Periodic data refresh (reads shared events.log → SQLite)
+    # ──────────────────────────────────────────────────────────────────────
+
+    def _periodic_refresh(self):
+        count = import_events_from_log()
+        if count > 0:
+            self.page_dashboard.refresh_data()
+            self.page_quarantine.refresh_data()
 
     # ──────────────────────────────────────────────────────────────────────
     #  System tray
     # ──────────────────────────────────────────────────────────────────────
 
     def closeEvent(self, event):
-        """Minimize to tray instead of quitting."""
         event.ignore()
         self.hide()
         self.tray_icon.showMessage(
             'ArgusShield',
             'Running in the background. Right-click the tray icon for options.',
-            QSystemTrayIcon.Information,
-            2000,
+            QSystemTrayIcon.Information, 2000,
         )
 
     def _show_from_tray(self):
@@ -198,6 +206,7 @@ class MainWindow(QMainWindow):
     def _quit_app(self):
         self._pipe_thread.stop()
         self._pipe_thread.wait(2000)
+        self._refresh_timer.stop()
         self.tray_icon.hide()
         QApplication.quit()
 
@@ -210,34 +219,24 @@ class MainWindow(QMainWindow):
     # ──────────────────────────────────────────────────────────────────────
 
     def _on_injection_alert(self, data: dict):
-        """Called when an injection alert arrives from the Agent pipe."""
-        dll_path = data.get('dll_path', 'Unknown DLL')
-        pid = data.get('target_pid', '?')
-        severity = data.get('severity', 'High')
+        dll_path  = data.get('dll_path', 'Unknown DLL')
+        pid       = data.get('target_pid', '?')
+        severity  = data.get('severity', 'High')
         technique = data.get('technique', 'DLL Injection')
+        action    = data.get('action', 'Blocked')
 
-        # Show a tray balloon notification
         self.tray_icon.showMessage(
-            f'⚠ Injection Detected [{severity}]',
-            f'{technique} blocked!\nPID: {pid}\nDLL: {dll_path}',
-            QSystemTrayIcon.Critical,
-            5000,
+            f'⚠ Injection {action} [{severity}]',
+            f'{technique} detected!\nPID: {pid}\nDLL: {dll_path}',
+            QSystemTrayIcon.Critical, 5000,
         )
 
-        # Add to quarantine table
-        import time
-        timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
-        self.page_quarantine.add_detection(
-            timestamp=timestamp,
-            process=f'PID {pid}',
-            source=dll_path,
-            attack_type=technique,
-            severity=severity,
-            status='Blocked',
-        )
+        # Trigger an immediate data refresh
+        import_events_from_log()
+        self.page_dashboard.refresh_data()
+        self.page_quarantine.refresh_data()
 
     def _on_agent_connection(self, connected: bool):
-        """Called when Agent pipe connects or disconnects."""
         if connected:
             self.tray_icon.setToolTip('ArgusShield — Protection Active (Agent Connected)')
         else:
@@ -249,7 +248,6 @@ class MainWindow(QMainWindow):
 
     def center_on_screen(self):
         screen_geo = QApplication.primaryScreen().availableGeometry()
-
         margin = 40
         max_w = max(320, screen_geo.width() - margin)
         max_h = max(240, screen_geo.height() - margin)
@@ -257,45 +255,41 @@ class MainWindow(QMainWindow):
         new_h = min(self.height(), max_h)
         if new_w != self.width() or new_h != self.height():
             self.resize(new_w, new_h)
-
         x = screen_geo.left() + (screen_geo.width() - self.width()) // 2
         y = screen_geo.top() + (screen_geo.height() - self.height()) // 2
-
         x = max(screen_geo.left(), min(x, screen_geo.left() + screen_geo.width() - self.width()))
         y = max(screen_geo.top(),  min(y, screen_geo.top()  + screen_geo.height() - self.height()))
         self.move(x, y)
 
     def toggle_install(self):
-        """Handle Install/Uninstall button click."""
         if not self.installed:
-            ok, message = self.install_service()
+            ok, message = self._install_all()
             if ok:
                 self.installed = True
                 set_install_state(True)
                 self.sync_install_button()
                 QMessageBox.information(
-                    self,
-                    "ArgusShield",
-                    "ArgusShield background service has been installed and started.",
+                    self, "ArgusShield",
+                    "ArgusShield Service + Agent installed and started.\n"
+                    "Dashboard auto-start has been configured.",
                 )
             else:
                 QMessageBox.critical(self, "Installation Failed", message)
         else:
-            ok, message = self.uninstall_service()
+            ok, message = self._uninstall_all()
             if ok:
                 self.installed = False
                 set_install_state(False)
                 self.sync_install_button()
                 QMessageBox.information(
-                    self,
-                    "ArgusShield",
-                    "ArgusShield background service has been uninstalled.",
+                    self, "ArgusShield",
+                    "ArgusShield Service + Agent uninstalled.\n"
+                    "Dashboard auto-start has been removed.",
                 )
             else:
                 QMessageBox.critical(self, "Uninstall Failed", message)
 
     def sync_install_button(self):
-        """Update button label and style from current install state."""
         if self.installed:
             self.install_button.setText('Uninstall Shield')
             self.install_button.setStyleSheet(UNINSTALL_BUTTON_STYLE)
@@ -304,23 +298,17 @@ class MainWindow(QMainWindow):
             self.install_button.setStyleSheet(INSTALL_BUTTON_STYLE)
 
     # ──────────────────────────────────────────────────────────────────────
-    #  Service + Agent management helpers (Windows only)
+    #  Service + Agent + Dashboard installation (all-in-one)
     # ──────────────────────────────────────────────────────────────────────
 
     def _find_bin_exe(self, name: str) -> str:
-        """Search standard locations for a binary (e.g. ArgusShieldService.exe)."""
-        # 1. PyInstaller bundled path
         exe_dir = os.path.dirname(sys.executable)
-        candidates = [
-            os.path.join(exe_dir, 'bin', name),
-        ]
+        candidates = [os.path.join(exe_dir, 'bin', name)]
 
-        # 2. Development-time fallbacks
         here = os.path.dirname(os.path.abspath(__file__))
-        project_root = os.path.dirname(os.path.dirname(here))  # ArgusShield-Dashboard
+        project_root = os.path.dirname(os.path.dirname(here))
         candidates.extend([
             os.path.join(project_root, 'bin', name),
-            # Direct build output fallbacks
             os.path.join(project_root, '..', 'ArgusShieldService', 'x64', 'Debug', name),
             os.path.join(project_root, '..', 'ArgusShieldService', 'x64', 'Release', name),
             os.path.join(project_root, '..', 'ArgusShieldAgent', 'x64', 'Debug', name),
@@ -333,7 +321,6 @@ class MainWindow(QMainWindow):
         return ''
 
     def _run_command(self, command: str):
-        """Run a shell command and return (success, stdout+stderr)."""
         try:
             completed = subprocess.run(
                 command, shell=True, capture_output=True, text=True,
@@ -343,72 +330,86 @@ class MainWindow(QMainWindow):
         except Exception as exc:
             return False, str(exc)
 
-    def install_service(self):
-        """Create and start the Windows service + launch the Agent."""
-        service_path = self._find_bin_exe('ArgusShieldService.exe')
-        if not service_path:
+    def _install_all(self):
+        """Install both Windows services + configure Dashboard auto-start."""
+
+        # ── 1. Install ArgusShieldService ────────────────────────────────
+        svc_path = self._find_bin_exe('ArgusShieldService.exe')
+        if not svc_path:
             return False, (
-                "ArgusShieldService.exe was not found.\n\n"
-                "Build the service project (ArgusShieldService) first, "
-                "or ensure bin/ArgusShieldService.exe exists."
+                "ArgusShieldService.exe not found.\n"
+                "Build the project and copy to bin/ folder."
             )
 
-        # ── Install the Windows Service ──────────────────────────────────
-        create_cmd = (
-            f'sc create ArgusShieldService '
-            f'binPath= "{service_path}" '
-            f'start= auto '
-            f'DisplayName= "ArgusShield Service"'
-        )
-        ok, output = self._run_command(create_cmd)
-        if not ok and 'SERVICE_EXISTS' not in output.upper():
-            return False, f"Failed to create service:\n{output}"
+        cmd = (f'sc create ArgusShieldService '
+               f'binPath= "{svc_path}" start= auto '
+               f'DisplayName= "ArgusShield Service"')
+        ok, out = self._run_command(cmd)
+        if not ok and 'SERVICE_EXISTS' not in out.upper():
+            return False, f"Failed to create service:\n{out}"
 
-        start_cmd = 'sc start ArgusShieldService'
-        ok, output = self._run_command(start_cmd)
-        if not ok and 'ALREADY_RUNNING' not in output.upper():
-            return False, f"Service created but failed to start:\n{output}"
+        ok, out = self._run_command('sc start ArgusShieldService')
+        if not ok and 'ALREADY_RUNNING' not in out.upper():
+            return False, f"Service created but failed to start:\n{out}"
 
-        # ── Launch the Agent (hidden background process) ─────────────────
-        self._start_agent()
-
-        return True, ''
-
-    def _start_agent(self):
-        """Start ArgusShieldAgent.exe as a detached hidden process."""
+        # ── 2. Install ArgusShieldAgent ──────────────────────────────────
         agent_path = self._find_bin_exe('ArgusShieldAgent.exe')
-        if not agent_path:
-            return  # Agent not found — not a fatal error
+        if agent_path:
+            cmd = (f'sc create ArgusShieldAgent '
+                   f'binPath= "{agent_path}" start= auto '
+                   f'DisplayName= "ArgusShield Agent"')
+            ok, out = self._run_command(cmd)
+            # Not fatal if agent install fails
 
-        try:
-            # DETACHED_PROCESS = 0x08  — no console window, runs independently
-            subprocess.Popen(
-                [agent_path],
-                creationflags=0x08,  # DETACHED_PROCESS
-                close_fds=True,
-            )
-        except Exception:
-            pass  # Best-effort — agent will auto-start on next login anyway
+            self._run_command('sc start ArgusShieldAgent')
 
-    def uninstall_service(self):
-        """Stop and delete the Windows service + kill the Agent."""
-        # ── Stop and delete the service ──────────────────────────────────
-        self._run_command('sc stop ArgusShieldService')
-        delete_cmd = 'sc delete ArgusShieldService'
-        ok, output = self._run_command(delete_cmd)
-        if not ok and 'SERVICE_DOES_NOT_EXIST' not in output.upper():
-            return False, f"Failed to delete service:\n{output}"
-
-        # ── Kill the Agent process ───────────────────────────────────────
-        self._run_command('taskkill /IM ArgusShieldAgent.exe /F')
-
-        # ── Remove Agent auto-start registry entry ───────────────────────
-        self._run_command(
-            'reg delete "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run" '
-            '/v ArgusShieldAgent /f'
-        )
+        # ── 3. Configure Dashboard auto-start on login ───────────────────
+        self._setup_dashboard_autostart()
 
         return True, ''
+
+    def _uninstall_all(self):
+        """Stop and remove both services + remove Dashboard auto-start."""
+
+        # Stop and delete Service
+        self._run_command('sc stop ArgusShieldService')
+        ok, out = self._run_command('sc delete ArgusShieldService')
+        if not ok and 'SERVICE_DOES_NOT_EXIST' not in out.upper():
+            return False, f"Failed to delete service:\n{out}"
+
+        # Stop and delete Agent
+        self._run_command('sc stop ArgusShieldAgent')
+        self._run_command('sc delete ArgusShieldAgent')
+
+        # Remove Dashboard auto-start
+        self._remove_dashboard_autostart()
+
+        return True, ''
+
+    # ── Dashboard auto-start (Task Scheduler) ────────────────────────────
+
+    def _setup_dashboard_autostart(self):
+        """Register a Task Scheduler task so the Dashboard starts on login."""
+        exe_path = sys.executable
+        if getattr(sys, 'frozen', False):
+            # PyInstaller bundle — use the exe directly
+            exe_path = sys.executable
+        else:
+            # Dev mode — run python script
+            script = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)), '..', 'ArgusShield.py'
+            )
+            exe_path = f'"{sys.executable}" "{os.path.abspath(script)}"'
+
+        cmd = (
+            f'schtasks /Create /F /TN "ArgusShieldDashboard" '
+            f'/TR "{exe_path}" '
+            f'/SC ONLOGON /RL HIGHEST'
+        )
+        self._run_command(cmd)
+
+    def _remove_dashboard_autostart(self):
+        self._run_command('schtasks /Delete /TN "ArgusShieldDashboard" /F')
 
     def switch_page(self, index):
         self.stack.setCurrentIndex(index)
@@ -417,4 +418,3 @@ class MainWindow(QMainWindow):
                 btn.setStyleSheet(NAV_BUTTON_STYLE + NAV_BUTTON_ACTIVE_STYLE)
             else:
                 btn.setStyleSheet(NAV_BUTTON_STYLE)
-
