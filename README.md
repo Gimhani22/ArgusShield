@@ -1,70 +1,66 @@
 # ⚠️ ArgusShield – Handle With Extreme Care
 
-## Important Warning
+## Overview
 
-ArgusShield is a powerful security research and detection tool designed for monitoring low-level system behavior (e.g., ETW-based telemetry, process injection patterns, and memory operations).
+ArgusShield is a security research and detection tool for monitoring low-level system behavior (for example ETW-based telemetry, process injection patterns, and memory operations).
 
-ArgusShield is developed strictly for:
+It is intended **only** for controlled, legitimate use by security professionals, researchers, and students.
 
-Security research
+## Intended Use
 
-Malware analysis (in controlled environments)
+Use ArgusShield strictly for:
 
-Detection engineering experiments
+- Security research and experimentation
+- Malware analysis in **isolated, controlled environments**
+- Detection engineering and tuning of behavioral rules
+- Academic and educational purposes with appropriate supervision
 
-Academic and educational purposes
+## Prohibited Use
 
-Do NOT use this tool for:
+Do **not** use ArgusShield for:
 
-Unauthorized monitoring of systems
+- Unauthorized monitoring of any system or user
+- Offensive security activities or testing without explicit permission
+- Deployment in production environments without comprehensive safeguards
+- Any illegal, unethical, or privacy-violating activities
 
-Offensive security activities without permission
+You are solely responsible for complying with all applicable laws, regulations, and organizational policies.
 
-Deployment in production environments without proper safeguards
-
-Any illegal or unethical activities
-
-⚙️ Safety Guidelines
+## Safety Guidelines
 
 Before running ArgusShield:
 
-✅ Use a Controlled Environment
+### Use a Controlled Environment
 
-Virtual Machine (VM) strongly recommended
+- Prefer a dedicated Virtual Machine (VM)
+- Use an isolated lab network whenever possible
+- Avoid running on your primary, day-to-day system
 
-Isolated lab setup preferred
+### Test Carefully
 
-Avoid running on your primary system
+- Start in **monitoring-only** mode (no blocking) when available
+- Validate detection logic thoroughly before enabling enforcement or blocking
+- Expect and review false positives during early experimentation
 
-✅ Test Carefully
+### Review Detection Logic
 
-Start with monitoring-only mode (no blocking)
+- Blocking decisions are based on behavioral patterns and scoring
+- Misconfigured rules may interfere with or block legitimate system processes
+- Regularly audit and document any custom rules or configuration changes
 
-Validate detection logic before enabling enforcement
+## Developer Note
 
-Expect false positives during early development
+ArgusShield is designed as a **defensive** security solution, but it operates close to techniques also used by malware (for example injection detection and memory inspection).
 
-✅ Review Detection Logic
+Because of this dual-use nature:
 
-Blocking decisions are based on behavioral patterns and scoring
+- ⚠️ Extreme caution is required at all times
+- Treat this as a **research-grade** system, not a plug-and-play product
 
-Incorrect configurations may block legitimate system processes
+Handle ArgusShield with the same care you would apply to:
 
-🛡️ Developer Note
+- Kernel-level tooling
+- Advanced debuggers
+- Reverse engineering and forensic frameworks
 
-ArgusShield is designed as a defensive security solution, but it operates close to techniques also used by malware (e.g., injection detection, memory inspection).
-
-This dual-use nature means:
-
-⚠️ Extreme caution is required at all times
-
-
-This is not a plug-and-play tool. It is a research-grade system.
-
-Handle it like you would handle:
-
-Kernel-level tools
-
-Debuggers
-
-Reverse engineering frameworks
+If you are unsure whether a particular use of ArgusShield is appropriate, stop and consult your organization’s security, legal, or compliance team before proceeding.
