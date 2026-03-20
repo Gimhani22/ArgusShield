@@ -37,7 +37,9 @@ struct InjectionAlertEvent
 	DWORD  sourcePid = 0;      // PID of the injecting process
 	DWORD  targetPid = 0;      // PID that received the injection
 	DWORD  remoteThreadId = 0; // Thread ID of the remote thread
+	DWORD  parentPid = 0;      // Parent PID of the source process
 	std::wstring dllPath;      // Full path of the injected DLL (may be empty)
+	std::wstring sourceImagePath; // Full image path of the source process
 	std::string  technique;    // e.g. "LoadLibrary", "RemoteThread"
 	std::string  severity;     // "Critical", "High", "Medium", "Low"
 };

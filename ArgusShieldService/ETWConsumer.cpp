@@ -62,6 +62,11 @@ static const ULONGLONG CORRELATION_WINDOW_MS = 5000;
 // Already-alerted PIDs (avoid duplicate alerts)
 static std::unordered_set<DWORD> g_alertedPids;
 
+// Process parent tracking: PID → parent PID
+static std::unordered_map<DWORD, DWORD> g_processParents;
+// Process image path tracking: PID → full image path
+static std::unordered_map<DWORD, std::wstring> g_processImagePaths;
+
 // ── Trusted path check ─────────────────────────────────────────────────────
 
 static bool IsTrustedPath(const std::wstring& path)
@@ -97,6 +102,21 @@ void SetInjectionAlertCallback(InjectionAlertCallback callback)
     g_alertCallback = std::move(callback);
 }
 
+// ── Helper to enrich alert with process context ───────────────────────────
+
+static void EnrichAlert(InjectionAlertEvent& alert)
+{
+    // Populate parent PID from tracked process-start events
+    auto parentIt = g_processParents.find(alert.sourcePid);
+    if (parentIt != g_processParents.end())
+        alert.parentPid = parentIt->second;
+
+    // Populate source image path
+    auto imgIt = g_processImagePaths.find(alert.sourcePid);
+    if (imgIt != g_processImagePaths.end())
+        alert.sourceImagePath = imgIt->second;
+}
+
 // ── Correlation engine ─────────────────────────────────────────────────────
 // Tries to match a remote thread event with a suspicious DLL load targeting
 // the same PID within the correlation window.  Fires an alert on match.
@@ -129,6 +149,7 @@ static void TryCorrelate(DWORD targetPid)
                 alert.remoteThreadId = rt.threadId;
                 alert.technique = "RemoteThread";
                 alert.severity = "Medium";
+                EnrichAlert(alert);
                 g_alertCallback(alert);
             }
         }
@@ -170,6 +191,7 @@ static void TryCorrelate(DWORD targetPid)
                         alert.severity = "Critical";
                     }
 
+                    EnrichAlert(alert);
                     g_alertCallback(alert);
                 }
                 return;
@@ -395,6 +417,7 @@ static void WINAPI EventRecordCallback(PEVENT_RECORD event)
                     alert.dllPath = payload.imagePath;
                     alert.technique = "LoadLibrary";
                     alert.severity = "High";
+                    EnrichAlert(alert);
                     g_alertCallback(alert);
                 }
             }
@@ -447,6 +470,20 @@ static void WINAPI EventRecordCallback(PEVENT_RECORD event)
         ULONG pid = 0;
         GetPropertyUInt32(event, L"ProcessId", pid);
 
+        if (opcode == OPCODE_PROCESS_START && pid != 0)
+        {
+            std::lock_guard<std::mutex> lk(g_detectionMutex);
+
+            // Track parent PID (from event header = calling process)
+            DWORD parentPid = event->EventHeader.ProcessId;
+            g_processParents[pid] = parentPid;
+
+            // Track image path
+            std::wstring imageName;
+            if (GetPropertyString(event, L"ImageFileName", imageName))
+                g_processImagePaths[pid] = imageName;
+        }
+
         if (opcode == OPCODE_PROCESS_END && pid != 0)
         {
             // Clean up tracking state for exited processes
@@ -455,6 +492,8 @@ static void WINAPI EventRecordCallback(PEVENT_RECORD event)
             g_remoteThreads.erase(pid);
             g_suspiciousDlls.erase(pid);
             g_alertedPids.erase(pid);
+            g_processParents.erase(pid);
+            g_processImagePaths.erase(pid);
         }
         return;
     }
@@ -555,5 +594,7 @@ void StopEtwSession()
         g_remoteThreads.clear();
         g_suspiciousDlls.clear();
         g_alertedPids.clear();
+        g_processParents.clear();
+        g_processImagePaths.clear();
     }
 }
