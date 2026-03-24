@@ -1,8 +1,0 @@
-build/
-dist/
-
-argusshield.db
-__pycache__/
-*.pyc
-
-bin/
