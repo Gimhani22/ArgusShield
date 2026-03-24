@@ -1,0 +1,144 @@
+<UserControl x:Class="ArgusShieldDashboard.Pages.DashboardPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="Transparent">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" BorderThickness="0">
+        <StackPanel Margin="14" MinWidth="600">
+            <!-- Header -->
+            <TextBlock Text="Dashboard" FontSize="28" FontWeight="Bold" Margin="0,0,0,5"/>
+            <TextBlock Text="ArgusShield Security Overview" Foreground="{StaticResource TextSecondary}" FontSize="13" Margin="0,0,0,14"/>
+
+            <!-- Status Banner -->
+            <Border x:Name="BannerBorder" Background="#152a1e" BorderBrush="{StaticResource LowColor}" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,0,0,14">
+                <TextBlock x:Name="BannerText" Text="Protection Active  -  System is Secure" Foreground="{StaticResource LowColor}" FontSize="14" FontWeight="Bold" HorizontalAlignment="Center"/>
+            </Border>
+
+            <!-- Stat Cards -->
+            <UniformGrid Columns="4" Margin="0,0,0,14" HorizontalAlignment="Stretch">
+                <Border Background="{StaticResource PanelBackground}" BorderBrush="{StaticResource CriticalColor}" BorderThickness="3,0,0,0" CornerRadius="8" Margin="0,0,12,0" Padding="14,10">
+                    <StackPanel>
+                        <TextBlock Text="TOTAL EVENTS" FontSize="11" FontWeight="Bold" Foreground="#666" Margin="0,0,0,5"/>
+                        <TextBlock x:Name="TxtTotal" Text="0" Style="{StaticResource StatValueText}" Foreground="{StaticResource CriticalColor}"/>
+                    </StackPanel>
+                </Border>
+                <Border Background="{StaticResource PanelBackground}" BorderBrush="{StaticResource HighColor}" BorderThickness="3,0,0,0" CornerRadius="8" Margin="0,0,12,0" Padding="14,10">
+                    <StackPanel>
+                        <TextBlock Text="ATTACKS BLOCKED" FontSize="11" FontWeight="Bold" Foreground="#666" Margin="0,0,0,5"/>
+                        <TextBlock x:Name="TxtBlocked" Text="0" Style="{StaticResource StatValueText}" Foreground="{StaticResource HighColor}"/>
+                    </StackPanel>
+                </Border>
+                <Border Background="{StaticResource PanelBackground}" BorderBrush="#f39c12" BorderThickness="3,0,0,0" CornerRadius="8" Margin="0,0,12,0" Padding="14,10">
+                    <StackPanel>
+                        <TextBlock Text="TODAY" FontSize="11" FontWeight="Bold" Foreground="#666" Margin="0,0,0,5"/>
+                        <TextBlock x:Name="TxtToday" Text="0" Style="{StaticResource StatValueText}" Foreground="#f39c12"/>
+                    </StackPanel>
+                </Border>
+                <Border Background="{StaticResource PanelBackground}" BorderBrush="#9b59b6" BorderThickness="3,0,0,0" CornerRadius="8" Padding="14,10">
+                    <StackPanel>
+                        <TextBlock Text="DLL INJECTIONS" FontSize="11" FontWeight="Bold" Foreground="#666" Margin="0,0,0,5"/>
+                        <TextBlock x:Name="TxtDll" Text="0" Style="{StaticResource StatValueText}" Foreground="#9b59b6"/>
+                    </StackPanel>
+                </Border>
+            </UniformGrid>
+
+            <!-- Activity Chart -->
+            <GroupBox Header="Weekly Activity" Style="{DynamicResource InnerBoxStyle}" Background="{StaticResource PanelBackground}" BorderBrush="#2a2a2a" Foreground="#888" BorderThickness="1" Margin="0,0,0,18" Padding="15" FontSize="13" FontWeight="Bold">
+                <Grid Height="150" Margin="10,10,10,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    
+                    <!-- Chart area -->
+                    <Border Grid.Row="0" BorderBrush="#333" BorderThickness="0,0,0,1">
+                        <ItemsControl x:Name="ChartItems" VerticalAlignment="Bottom">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <UniformGrid Rows="1" Background="Transparent"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid VerticalAlignment="Bottom" Margin="5,0">
+                                        <Border Background="{StaticResource AccentColor}" 
+                                                Height="{Binding BarHeight}" 
+                                                CornerRadius="3,3,0,0"
+                                                VerticalAlignment="Bottom"
+                                                ToolTip="{Binding TooltipText}">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Style.Triggers>
+                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                            <Setter Property="Background" Value="{StaticResource AccentHover}"/>
+                                                        </Trigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                        </Border>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Border>
+                    
+                    <!-- X Axis Labels -->
+                    <ItemsControl x:Name="ChartLabels" Grid.Row="1" Margin="0,5,0,0">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <UniformGrid Rows="1" Background="Transparent"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Label}" Foreground="#777" FontSize="11" HorizontalAlignment="Center"/>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Grid>
+            </GroupBox>
+
+            <!-- Recent Activity -->
+            <GroupBox Header="Recent Activity" Style="{DynamicResource InnerBoxStyle}" Background="{StaticResource PanelBackground}" BorderBrush="#2a2a2a" Foreground="#888" BorderThickness="1" Margin="0,18,0,0" Padding="6,15,6,6" FontSize="13" FontWeight="Bold">
+                <DataGrid x:Name="RecentGrid" Height="250" Margin="0,5,0,0">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Time" Binding="{Binding Timestamp}" Width="*"/>
+                        <DataGridTextColumn Header="Event" Binding="{Binding EventType}" Width="*"/>
+                        <DataGridTextColumn Header="Source PID" Binding="{Binding Pid}" Width="*"/>
+                        <DataGridTextColumn Header="Target PID" Binding="{Binding TargetPid}" Width="*"/>
+                        <DataGridTextColumn Header="Technique" Binding="{Binding Technique}" Width="*"/>
+                        <DataGridTextColumn Header="Action" Binding="{Binding Action}" Width="*"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </GroupBox>
+
+            <!-- System Info -->
+            <GroupBox Header="System Information" Style="{DynamicResource InnerBoxStyle}" Background="{StaticResource PanelBackground}" BorderBrush="#2a2a2a" Foreground="#888" BorderThickness="1" Margin="0,18,0,0" Padding="12,20,12,12" FontSize="13" FontWeight="Bold">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Text="Protection Mode:" Grid.Row="0" Grid.Column="0" Foreground="#666" Margin="0,0,10,10"/>
+                    <TextBlock Text="Real-time" Grid.Row="0" Grid.Column="1" Foreground="#ddd" FontWeight="Bold" Margin="0,0,0,10"/>
+
+                    <TextBlock Text="Detection Engine:" Grid.Row="1" Grid.Column="0" Foreground="#666" Margin="0,0,10,10"/>
+                    <TextBlock Text="Multi-Layer Scoring" Grid.Row="1" Grid.Column="1" Foreground="#ddd" FontWeight="Bold" Margin="0,0,0,10"/>
+
+                    <TextBlock Text="ETW Service:" Grid.Row="2" Grid.Column="0" Foreground="#666" Margin="0,0,10,10"/>
+                    <TextBlock Text="ArgusShieldService" Grid.Row="2" Grid.Column="1" Foreground="#ddd" FontWeight="Bold" Margin="0,0,0,10"/>
+
+                    <TextBlock Text="Agent Service:" Grid.Row="3" Grid.Column="0" Foreground="#666" Margin="0,0,10,10"/>
+                    <TextBlock Text="ArgusShieldAgent" Grid.Row="3" Grid.Column="1" Foreground="#ddd" FontWeight="Bold" Margin="0,0,0,10"/>
+                </Grid>
+            </GroupBox>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
