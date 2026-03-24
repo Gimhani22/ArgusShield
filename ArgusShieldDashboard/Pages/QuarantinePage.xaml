@@ -7,7 +7,7 @@
         <StackPanel Margin="14" MinWidth="600">
             <Grid Margin="0,0,0,14">
                 <StackPanel>
-                    <TextBlock Text="Quarantine" FontSize="28" FontWeight="Bold" Margin="0,0,0,5"/>
+                    <TextBlock Text="Quarantine" FontSize="28" FontWeight="Bold" Margin="0,0,0,5" Foreground="{StaticResource TextPrimary}"/>
                     <TextBlock Text="Attacks detected and blocked by ArgusShield" Foreground="{StaticResource TextSecondary}" FontSize="13"/>
                 </StackPanel>
                 <Button Content="Export CSV" HorizontalAlignment="Right" VerticalAlignment="Center"

@@ -6,7 +6,7 @@
     <ScrollViewer VerticalScrollBarVisibility="Auto" BorderThickness="0">
         <StackPanel Margin="14" MinWidth="600">
             <!-- Header -->
-            <TextBlock Text="Dashboard" FontSize="28" FontWeight="Bold" Margin="0,0,0,5"/>
+            <TextBlock Text="Dashboard" FontSize="28" FontWeight="Bold" Margin="0,0,0,5" Foreground="{StaticResource TextPrimary}"/>
             <TextBlock Text="ArgusShield Security Overview" Foreground="{StaticResource TextSecondary}" FontSize="13" Margin="0,0,0,14"/>
 
             <!-- Status Banner -->
