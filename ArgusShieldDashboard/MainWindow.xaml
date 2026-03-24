@@ -1,0 +1,43 @@
+<Window x:Class="ArgusShieldDashboard.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="ArgusShield" Height="650" Width="1000"
+        WindowStartupLocation="CenterScreen"
+        Closing="Window_Closing">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="220"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- Sidebar -->
+        <Border Grid.Column="0" Background="{StaticResource SidebarBackground}" BorderBrush="#333" BorderThickness="0,0,1,0">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <StackPanel Grid.Row="0" Margin="0,20,0,0">
+                    <RadioButton x:Name="BtnDashboard" Content="  Dashboard" Style="{StaticResource NavButton}" GroupName="NavGroup" IsChecked="True" Checked="Nav_Checked"/>
+                    <RadioButton x:Name="BtnQuarantine" Content="  Quarantine" Style="{StaticResource NavButton}" GroupName="NavGroup" Checked="Nav_Checked"/>
+                    <RadioButton x:Name="BtnAbout" Content="  About" Style="{StaticResource NavButton}" GroupName="NavGroup" Checked="Nav_Checked"/>
+                </StackPanel>
+
+                <Button x:Name="BtnInstall" Grid.Row="2" Content="Install Shield" FontSize="18" FontWeight="Bold" Margin="15,20,15,20" Padding="12" Foreground="White" Background="{StaticResource LowColor}" BorderThickness="0" Cursor="Hand" Click="BtnInstall_Click">
+                    <Button.Resources>
+                        <Style TargetType="Border">
+                            <Setter Property="CornerRadius" Value="8"/>
+                        </Style>
+                    </Button.Resources>
+                </Button>
+            </Grid>
+        </Border>
+
+        <!-- Main Content -->
+        <Border Grid.Column="1" Background="#222" Margin="0" CornerRadius="10">
+            <ContentControl x:Name="MainContent" Margin="0"/>
+        </Border>
+    </Grid>
+</Window>
