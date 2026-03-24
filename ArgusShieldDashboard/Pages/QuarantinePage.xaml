@@ -1,0 +1,75 @@
+<UserControl x:Class="ArgusShieldDashboard.Pages.QuarantinePage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="Transparent">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" BorderThickness="0">
+        <StackPanel Margin="14" MinWidth="600">
+            <Grid Margin="0,0,0,14">
+                <StackPanel>
+                    <TextBlock Text="Quarantine" FontSize="28" FontWeight="Bold" Margin="0,0,0,5"/>
+                    <TextBlock Text="Attacks detected and blocked by ArgusShield" Foreground="{StaticResource TextSecondary}" FontSize="13"/>
+                </StackPanel>
+                <Button Content="Export CSV" HorizontalAlignment="Right" VerticalAlignment="Center"
+                        Background="Transparent" Foreground="{StaticResource AccentColor}" 
+                        BorderBrush="{StaticResource AccentColor}" BorderThickness="1" 
+                        Padding="16,7" FontSize="13" Cursor="Hand" Click="ExportCSV_Click">
+                    <Button.Resources>
+                        <Style TargetType="Border">
+                            <Setter Property="CornerRadius" Value="5"/>
+                        </Style>
+                    </Button.Resources>
+                </Button>
+            </Grid>
+
+            <!-- Stat Cards -->
+            <UniformGrid Columns="5" Margin="0,0,0,14" HorizontalAlignment="Stretch">
+                <Border Background="{StaticResource PanelBackground}" BorderBrush="{StaticResource CriticalColor}" BorderThickness="3,0,0,0" CornerRadius="8" Margin="0,0,12,0" Padding="14,10">
+                    <StackPanel>
+                        <TextBlock Text="TOTAL EVENTS" FontSize="11" FontWeight="Bold" Foreground="#666" Margin="0,0,0,5"/>
+                        <TextBlock x:Name="TxtTotal" Text="0" Style="{StaticResource StatValueText}" Foreground="{StaticResource CriticalColor}"/>
+                    </StackPanel>
+                </Border>
+                <Border Background="{StaticResource PanelBackground}" BorderBrush="{StaticResource HighColor}" BorderThickness="3,0,0,0" CornerRadius="8" Margin="0,0,12,0" Padding="14,10">
+                    <StackPanel>
+                        <TextBlock Text="BLOCKED" FontSize="11" FontWeight="Bold" Foreground="#666" Margin="0,0,0,5"/>
+                        <TextBlock x:Name="TxtBlocked" Text="0" Style="{StaticResource StatValueText}" Foreground="{StaticResource HighColor}"/>
+                    </StackPanel>
+                </Border>
+                <Border Background="{StaticResource PanelBackground}" BorderBrush="{StaticResource CriticalColor}" BorderThickness="3,0,0,0" CornerRadius="8" Margin="0,0,12,0" Padding="14,10">
+                    <StackPanel>
+                        <TextBlock Text="CRITICAL" FontSize="11" FontWeight="Bold" Foreground="#666" Margin="0,0,0,5"/>
+                        <TextBlock x:Name="TxtCritical" Text="0" Style="{StaticResource StatValueText}" Foreground="{StaticResource CriticalColor}"/>
+                    </StackPanel>
+                </Border>
+                <Border Background="{StaticResource PanelBackground}" BorderBrush="{StaticResource HighColor}" BorderThickness="3,0,0,0" CornerRadius="8" Margin="0,0,12,0" Padding="14,10">
+                    <StackPanel>
+                        <TextBlock Text="HIGH" FontSize="11" FontWeight="Bold" Foreground="#666" Margin="0,0,0,5"/>
+                        <TextBlock x:Name="TxtHigh" Text="0" Style="{StaticResource StatValueText}" Foreground="{StaticResource HighColor}"/>
+                    </StackPanel>
+                </Border>
+                <Border Background="{StaticResource PanelBackground}" BorderBrush="{StaticResource MediumColor}" BorderThickness="3,0,0,0" CornerRadius="8" Padding="14,10">
+                    <StackPanel>
+                        <TextBlock Text="MEDIUM" FontSize="11" FontWeight="Bold" Foreground="#666" Margin="0,0,0,5"/>
+                        <TextBlock x:Name="TxtMedium" Text="0" Style="{StaticResource StatValueText}" Foreground="{StaticResource MediumColor}"/>
+                    </StackPanel>
+                </Border>
+            </UniformGrid>
+
+            <!-- Event Log -->
+            <GroupBox Header="Event Log" Style="{DynamicResource InnerBoxStyle}" Background="{StaticResource PanelBackground}" BorderBrush="#2a2a2a" Foreground="#888" BorderThickness="1" Margin="0,18,0,0" Padding="6,15,6,6" FontSize="13" FontWeight="Bold">
+                <DataGrid x:Name="QuarantineGrid" Height="350" Margin="0,5,0,0">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Timestamp" Binding="{Binding Timestamp}" Width="1.2*"/>
+                        <DataGridTextColumn Header="Source PID" Binding="{Binding Pid}" Width="0.8*"/>
+                        <DataGridTextColumn Header="Target PID" Binding="{Binding TargetPid}" Width="0.8*"/>
+                        <DataGridTextColumn Header="DLL / Source" Binding="{Binding DllPath}" Width="2*"/>
+                        <DataGridTextColumn Header="Technique" Binding="{Binding Technique}" Width="1.2*"/>
+                        <DataGridTextColumn Header="Severity" Binding="{Binding Severity}" Width="0.8*"/>
+                        <DataGridTextColumn Header="Action" Binding="{Binding Action}" Width="0.8*"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </GroupBox>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
