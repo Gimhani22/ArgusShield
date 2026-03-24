@@ -4,7 +4,7 @@ using System.IO;
 using Microsoft.Data.Sqlite;
 
 namespace ArgusShieldDashboard
-{
+{ 
     public class EventDetection
     {
         public string Timestamp { get; set; } = "";
