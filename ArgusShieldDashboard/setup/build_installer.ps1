@@ -16,12 +16,12 @@ Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
 Write-Host "[1/3] Checking dependencies..." -ForegroundColor Green
-$DashboardExe = Join-Path $ProjectDir "bin\Debug\net8.0-windows\win-x64\publish\ArgusShieldDashboard.exe"
+$DashboardExe = Join-Path $ProjectDir "bin\Release\net8.0-windows\win-x64\publish\ArgusShieldDashboard.exe"
 
 if (-not (Test-Path $DashboardExe)) {
     Write-Host "  WARNING: Dashboard executable not found at:" -ForegroundColor Yellow
     Write-Host "  $DashboardExe" -ForegroundColor Yellow
-    Write-Host "  Please run 'dotnet publish -c Debug -r win-x64 --self-contained true -p:PublishSingleFile=true' first." -ForegroundColor Yellow
+    Write-Host "  Please run 'dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true' first." -ForegroundColor Yellow
     exit 1
 }
 

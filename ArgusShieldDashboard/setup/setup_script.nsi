@@ -70,7 +70,7 @@ Section "MainSection" SEC01
     SetOverwrite on
     
     ; Copy main application files
-    File "/oname=ArgusShield.exe" "..\bin\Debug\net8.0-windows\win-x64\publish\ArgusShieldDashboard.exe"
+    File "/oname=ArgusShield.exe" "..\bin\Release\net8.0-windows\win-x64\publish\ArgusShieldDashboard.exe"
     
     ; Copy icon if exists
     File /nonfatal "..\..\ArgusShieldDashboard\icon.ico"
