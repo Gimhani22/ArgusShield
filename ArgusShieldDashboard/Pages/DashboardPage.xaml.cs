@@ -18,6 +18,8 @@ namespace ArgusShieldDashboard.Pages
             TxtBlocked.Text = stats.Blocked.ToString();
             TxtToday.Text = stats.Today.ToString();
             TxtDll.Text = stats.DllInjection.ToString();
+            TxtManualMapping.Text = stats.ManualMapping.ToString();
+            TxtProcessHollowing.Text = stats.ProcessHollowing.ToString();
 
             if (stats.Blocked > 0)
             {
