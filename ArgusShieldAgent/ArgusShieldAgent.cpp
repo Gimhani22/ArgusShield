@@ -23,6 +23,7 @@
 #include <deque>
 #include <algorithm>
 #include <mutex>
+#include "MemoryScanner.h"
 
 #pragma comment(lib, "wintrust.lib")
 #pragma comment(lib, "crypt32.lib")
@@ -938,6 +939,111 @@ static void ReadServicePipe(HANDLE pipeHandle)
     }
 }
 
+// ── Memory Scan Thread (periodic manual mapping / hollowing detection) ──────
+
+// Track already-alerted PIDs to avoid duplicate scan alerts per session
+static std::mutex g_ScanAlertMutex;
+static std::unordered_map<DWORD, ULONGLONG> g_ScanAlertedPids;
+static const ULONGLONG SCAN_ALERT_COOLDOWN_MS = 60000; // 60 seconds cooldown per PID
+
+static DWORD WINAPI MemoryScanThread(LPVOID)
+{
+    Log("Memory scanner started (Manual Mapping + Process Hollowing detection)");
+
+    // Wait 10 seconds on startup to let system settle
+    for (int i = 0; i < 20 && g_Running; i++)
+        Sleep(500);
+
+    while (g_Running)
+    {
+        auto findings = ScanAllProcesses();
+
+        for (const auto& finding : findings)
+        {
+            // ── De-duplicate: skip if we already alerted for this PID recently
+            {
+                std::lock_guard<std::mutex> lk(g_ScanAlertMutex);
+                ULONGLONG now = GetTickCount64();
+                auto it = g_ScanAlertedPids.find(finding.pid);
+                if (it != g_ScanAlertedPids.end())
+                {
+                    if (now - it->second < SCAN_ALERT_COOLDOWN_MS)
+                        continue;  // Skip — recently alerted
+                }
+                g_ScanAlertedPids[finding.pid] = now;
+            }
+
+            const char* technique = DetectionTypeToTechnique(finding.type);
+            const char* severity = DetectionTypeToSeverity(finding.type);
+
+            Log("MEMORY SCAN ALERT: " + std::string(technique)
+                + " [" + severity + "] PID=" + std::to_string(finding.pid)
+                + " (" + finding.processName + ") Score=" + std::to_string(finding.score)
+                + " — " + finding.description);
+
+            // ── Decision based on detection score ──────────────────────
+            std::string action;
+            std::string decision;
+            std::string details;
+
+            if (finding.score >= 8)
+            {
+                // HIGH score → BLOCK the injector process
+                decision = "Block";
+                bool blocked = BlockInjection(finding.pid, 0, 0);
+                action = blocked ? "Blocked" : "DetectedOnly";
+                details = blocked
+                    ? "Score " + std::to_string(finding.score) + " — process terminated by memory scan"
+                    : "Score " + std::to_string(finding.score) + " — could not terminate";
+
+                Log("SCAN DECISION: BLOCK (score=" + std::to_string(finding.score)
+                    + ") " + (blocked ? "SUCCESS" : "FAILED"));
+            }
+            else
+            {
+                // MEDIUM score → ALERT only
+                decision = "Alert";
+                action = "Alerted";
+                details = "Score " + std::to_string(finding.score)
+                    + " — suspicious, monitoring. " + finding.description;
+
+                Log("SCAN DECISION: ALERT (score=" + std::to_string(finding.score) + ")");
+            }
+
+            // ── Write to events.log ────────────────────────────────────
+            WriteEvent(
+                (finding.score >= 8 ? "BLOCKING" : "ALERT"),
+                finding.pid, 0,
+                "",   // No DLL path for memory-scan detections
+                technique,
+                severity,
+                action,
+                details);
+
+            // ── Forward to Dashboard ──────────────────────────────────
+            std::ostringstream dashMsg;
+            dashMsg << "InjectionAlert"
+                    << "|source_pid=" << finding.pid
+                    << "|target_pid=" << finding.pid
+                    << "|dll_path="
+                    << "|technique=" << technique
+                    << "|severity=" << severity
+                    << "|action=" << action
+                    << "|score=" << finding.score
+                    << "|decision=" << decision
+                    << "\n";
+            SendToDashboard(dashMsg.str());
+        }
+
+        // Sleep 15 seconds between scans (check g_Running every 500ms)
+        for (int i = 0; i < 30 && g_Running; i++)
+            Sleep(500);
+    }
+
+    Log("Memory scanner stopped.");
+    return 0;
+}
+
 // ── Worker thread (runs the actual agent logic) ─────────────────────────────
 
 static DWORD WINAPI AgentWorkerThread(LPVOID)
@@ -951,6 +1057,10 @@ static DWORD WINAPI AgentWorkerThread(LPVOID)
 
     // Start Dashboard pipe server thread
     HANDLE hDashThread = CreateThread(nullptr, 0, DashPipeThread, nullptr, 0, nullptr);
+
+    // Start memory scanner thread (Manual Mapping + Process Hollowing detection)
+    HANDLE hScanThread = CreateThread(nullptr, 0, MemoryScanThread, nullptr, 0, nullptr);
+    Log("Launched memory scanner thread");
 
     // Main loop: connect to Service pipe and process events
     while (g_Running)
@@ -971,6 +1081,11 @@ static DWORD WINAPI AgentWorkerThread(LPVOID)
     }
 
     // Cleanup
+    if (hScanThread)
+    {
+        WaitForSingleObject(hScanThread, 5000);
+        CloseHandle(hScanThread);
+    }
     if (hDashThread)
     {
         WaitForSingleObject(hDashThread, 3000);
