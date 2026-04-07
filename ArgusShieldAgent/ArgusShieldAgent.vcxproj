@@ -136,6 +136,10 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="ArgusShieldAgent.cpp" />
+    <ClCompile Include="MemoryScanner.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="MemoryScanner.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
