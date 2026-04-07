@@ -29,6 +29,8 @@ namespace ArgusShieldDashboard
         public int Low { get; set; }
         public int Today { get; set; }
         public int DllInjection { get; set; }
+        public int ManualMapping { get; set; }
+        public int ProcessHollowing { get; set; }
     }
 
     public static class Database
@@ -318,6 +320,12 @@ namespace ArgusShieldDashboard
 
                 cmd.CommandText = "SELECT COUNT(*) FROM events WHERE technique = 'LoadLibrary'";
                 stats.DllInjection = Convert.ToInt32(cmd.ExecuteScalar() ?? 0);
+
+                cmd.CommandText = "SELECT COUNT(*) FROM events WHERE technique = 'ManualMapping'";
+                stats.ManualMapping = Convert.ToInt32(cmd.ExecuteScalar() ?? 0);
+
+                cmd.CommandText = "SELECT COUNT(*) FROM events WHERE technique = 'ProcessHollowing'";
+                stats.ProcessHollowing = Convert.ToInt32(cmd.ExecuteScalar() ?? 0);
             }
             catch { }
             return stats;
