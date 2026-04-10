@@ -1011,7 +1011,7 @@ static DWORD WINAPI MemoryScanThread(LPVOID)
             {
                 // HIGH score → BLOCK the injector process
                 decision = "Block";
-                bool blocked = BlockInjection(finding.pid, 0, 0);
+                bool blocked = BlockInjection(finding.parentPid, finding.pid, 0);
                 action = blocked ? "Blocked" : "DetectedOnly";
                 details = blocked
                     ? "Score " + std::to_string(finding.score) + " — process terminated by memory scan"
