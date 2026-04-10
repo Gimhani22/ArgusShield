@@ -1,4 +1,4 @@
-// ============================================================================
+
 // MemoryScanner.cpp — Manual Mapping & Process Hollowing Detection Engine
 //
 // Implements all 10 steps of the detection specification:
@@ -12,7 +12,6 @@
 //   Step 8:  Heuristic engine (combine signals → score)
 //   Step 9:  Real-time logging
 //   Step 10: Detection score
-// ============================================================================
 
 #include "MemoryScanner.h"
 
@@ -28,7 +27,7 @@
 
 #pragma comment(lib, "psapi.lib")
 
-// ── Dynamically loaded ntdll functions ──────────────────────────────────────
+// Dynamically loaded ntdll functions 
 
 typedef NTSTATUS(NTAPI* pfnNtQueryInformationProcess)(
     HANDLE, ULONG, PVOID, ULONG, PULONG);
@@ -55,7 +54,7 @@ static void InitNtFunctions()
     initialized = true;
 }
 
-// ── Processes to skip (system + our own services) ───────────────────────────
+// Processes to skip (system + our own services) 
 
 static const std::unordered_set<std::string> g_SkipProcesses = {
     // Windows core
@@ -89,7 +88,7 @@ static const std::unordered_set<std::string> g_SkipProcesses = {
     "argusshielddashboard.exe"
 };
 
-// ── String helpers ──────────────────────────────────────────────────────────
+// String helpers 
 
 static std::string ToLowerStr(const std::string& s)
 {
@@ -106,7 +105,7 @@ static std::string GetFilenameFromPath(const std::string& path)
     return path;
 }
 
-// ── Technique / severity string conversion ──────────────────────────────────
+// Technique / severity string conversion 
 
 const char* DetectionTypeToTechnique(DetectionType type)
 {
@@ -134,9 +133,7 @@ const char* DetectionTypeToSeverity(DetectionType type)
     }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
 // STEP 1 — Process Enumeration
-// ═══════════════════════════════════════════════════════════════════════════════
 
 struct ProcessInfo
 {
@@ -176,9 +173,7 @@ static std::vector<ProcessInfo> EnumerateProcesses()
     return procs;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
 // STEP 3 — Memory Region Scanning
-// ═══════════════════════════════════════════════════════════════════════════════
 
 struct SuspiciousRegion
 {
@@ -259,9 +254,7 @@ static std::vector<SuspiciousRegion> ScanMemoryRegions(HANDLE hProcess)
     return regions;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
 // STEP 4 — PE Header Scan (MZ Detection in Private Memory)
-// ═══════════════════════════════════════════════════════════════════════════════
 
 static bool CheckMZHeader(HANDLE hProcess, ULONG_PTR address)
 {
@@ -307,9 +300,7 @@ static bool ValidatePEHeader(HANDLE hProcess, ULONG_PTR address, SIZE_T regionSi
     return (ntHeaders.Signature == IMAGE_NT_SIGNATURE);
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
 // STEP 5 — Process Hollowing Detection (Entry Point Check)
-// ═══════════════════════════════════════════════════════════════════════════════
 
 struct EntryPointInfo
 {
@@ -409,9 +400,7 @@ static EntryPointInfo CheckEntryPoint(HANDLE hProcess)
     return info;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
 // STEP 6 — Thread Start Address Analysis
-// ═══════════════════════════════════════════════════════════════════════════════
 
 struct ThreadInfo
 {
@@ -483,9 +472,7 @@ static std::vector<ThreadInfo> AnalyzeThreads(HANDLE hProcess, DWORD pid)
     return results;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
 // STEP 7 — Module List vs Memory Comparison
-// ═══════════════════════════════════════════════════════════════════════════════
 
 struct ModuleRegion
 {
@@ -529,23 +516,21 @@ static bool IsAddressInModuleList(ULONG_PTR address, const std::vector<ModuleReg
     return false;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
 // STEPS 8-10 — Heuristic Engine + Scoring + Scan Orchestration
-// ═══════════════════════════════════════════════════════════════════════════════
 
 std::vector<MemoryScanResult> ScanProcess(DWORD pid, const std::string& processName)
 {
     std::vector<MemoryScanResult> results;
     InitNtFunctions();
 
-    // ── STEP 2: Open process safely ────────────────────────────────────
+    // STEP 2: Open process safely 
     HANDLE hProcess = OpenProcess(
         PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pid);
 
     if (!hProcess)
         return results;
 
-    // ── STEP 3: Scan memory regions ────────────────────────────────────
+    // STEP 3: Scan memory regions 
     std::vector<SuspiciousRegion> suspiciousRegions = ScanMemoryRegions(hProcess);
 
     if (suspiciousRegions.empty())
@@ -554,10 +539,10 @@ std::vector<MemoryScanResult> ScanProcess(DWORD pid, const std::string& processN
         // then clean up
     }
 
-    // ── STEP 7: Get module list ────────────────────────────────────────
+    // STEP 7: Get module list 
     std::vector<ModuleRegion> modules = GetLoadedModules(hProcess);
 
-    // ── STEP 4 + STEP 7 combined: Check each suspicious region ─────────
+    // STEP 4 + STEP 7 combined: Check each suspicious region 
     for (auto& region : suspiciousRegions)
     {
         // Check if this region is backed by a known module
@@ -573,7 +558,7 @@ std::vector<MemoryScanResult> ScanProcess(DWORD pid, const std::string& processN
 
         region.hasMZHeader = validPE;
 
-        // ── STEP 8: Heuristic rules ────────────────────────────────────
+        // STEP 8: Heuristic rules 
 
         // RULE 1: Manual Mapping Detection
         // PE header found in private memory AND not in module list
@@ -635,7 +620,7 @@ std::vector<MemoryScanResult> ScanProcess(DWORD pid, const std::string& processN
         }
     }
 
-    // ── STEP 5: Process Hollowing Detection ────────────────────────────
+    // STEP 5: Process Hollowing Detection
     EntryPointInfo epInfo = CheckEntryPoint(hProcess);
     if (epInfo.valid && epInfo.mismatch)
     {
@@ -656,7 +641,7 @@ std::vector<MemoryScanResult> ScanProcess(DWORD pid, const std::string& processN
         results.push_back(result);
     }
 
-    // ── STEP 6: Thread Start Address Analysis ──────────────────────────
+    // STEP 6: Thread Start Address Analysis
     std::vector<ThreadInfo> suspiciousThreads = AnalyzeThreads(hProcess, pid);
     for (const auto& thread : suspiciousThreads)
     {
@@ -743,9 +728,10 @@ std::vector<MemoryScanResult> ScanAllProcesses()
         // Scan this process
         auto results = ScanProcess(proc.pid, proc.name);
 
-        // Only keep results with score > threshold (STEP 10)
+        // Assign the parentPid to all results and filter by score
         for (auto& r : results)
         {
+            r.parentPid = proc.parentPid;
             if (r.score >= 5)  // Score threshold for reporting
             {
                 allResults.push_back(std::move(r));

@@ -34,6 +34,7 @@ struct MemoryScanResult
 {
     DetectionType   type;
     DWORD           pid            = 0;
+    DWORD           parentPid      = 0;
     std::string     processName;
     ULONG_PTR       address        = 0;
     SIZE_T          regionSize     = 0;
