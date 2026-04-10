@@ -112,11 +112,11 @@ const char* DetectionTypeToTechnique(DetectionType type)
 {
     switch (type)
     {
-    case DetectionType::ManualMapping:    return "ManualMapping";
-    case DetectionType::ProcessHollowing: return "ProcessHollowing";
-    case DetectionType::SuspiciousThread: return "SuspiciousThread";
-    case DetectionType::HiddenModule:     return "HiddenModule";
-    case DetectionType::RWXMemory:        return "RWXMemory";
+    case DetectionType::ManualMapping:    return "Manual Mapping Injection";
+    case DetectionType::ProcessHollowing: return "Process Hollowing";
+    case DetectionType::SuspiciousThread: return "Suspicious Thread";
+    case DetectionType::HiddenModule:     return "Hidden Module";
+    case DetectionType::RWXMemory:        return "RWX Memory";
     default:                              return "Unknown";
     }
 }

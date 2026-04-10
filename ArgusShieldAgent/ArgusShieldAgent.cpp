@@ -610,7 +610,7 @@ static ScoreBreakdown CalculateThreatScore(
     }
 
     // ── Base score: injection into another process ──────────────────────
-    score.Add("CrossProcessInjection", +30);
+    score.Add("CrossProcessInjection", +20);
 
     // ── Code Signing ────────────────────────────────────────────────────
     SigningInfo signing = CheckCodeSigning(sourceImagePath);
@@ -726,14 +726,14 @@ static ScoreBreakdown CalculateThreatScore(
     return score;
 }
 
-// ── BLOCKING — TerminateProcess on the injecting process ────────────────────
+// ── BLOCKING — TerminateProcess on the injecting and infected processes ────
 
 static bool BlockInjection(DWORD sourcePid, DWORD targetPid, DWORD threadId)
 {
     bool blocked = false;
 
     // Strategy 1: Terminate the INJECTOR process (source PID)
-    if (sourcePid != 0)
+    if (sourcePid != 0 && sourcePid != 4 && sourcePid != GetCurrentProcessId())
     {
         HANDLE hProcess = OpenProcess(PROCESS_TERMINATE, FALSE, sourcePid);
         if (hProcess)
@@ -752,7 +752,7 @@ static bool BlockInjection(DWORD sourcePid, DWORD targetPid, DWORD threadId)
         }
     }
 
-    // Strategy 2: Suspend the remote thread in the target process
+    // Strategy 2: Suspend and terminate the remote thread in the target process
     if (threadId != 0)
     {
         HANDLE hThread = OpenThread(THREAD_SUSPEND_RESUME | THREAD_TERMINATE, FALSE, threadId);
@@ -763,6 +763,27 @@ static bool BlockInjection(DWORD sourcePid, DWORD targetPid, DWORD threadId)
             CloseHandle(hThread);
             Log("BLOCKED: Terminated remote thread ID=" + std::to_string(threadId));
             blocked = true;
+        }
+    }
+
+    // Strategy 3: Terminate the TARGET process (victim) to guarantee payload neutralization.
+    // Necessary for completely blocking attacks like Process Hollowing and LoadLibrary.
+    if (targetPid != 0 && targetPid != 4 && targetPid != GetCurrentProcessId() && targetPid != sourcePid)
+    {
+        HANDLE hProcess = OpenProcess(PROCESS_TERMINATE, FALSE, targetPid);
+        if (hProcess)
+        {
+            if (TerminateProcess(hProcess, 1))
+            {
+                Log("BLOCKED: Terminated infected target process PID=" + std::to_string(targetPid));
+                blocked = true;
+            }
+            else
+            {
+                Log("WARN: Failed to terminate target PID=" + std::to_string(targetPid)
+                    + " Error=" + std::to_string(GetLastError()));
+            }
+            CloseHandle(hProcess);
         }
     }
 
@@ -1035,8 +1056,8 @@ static DWORD WINAPI MemoryScanThread(LPVOID)
             SendToDashboard(dashMsg.str());
         }
 
-        // Sleep 15 seconds between scans (check g_Running every 500ms)
-        for (int i = 0; i < 30 && g_Running; i++)
+        // Sleep 2 seconds between scans (check g_Running every 500ms)
+        for (int i = 0; i < 4 && g_Running; i++)
             Sleep(500);
     }
 
