@@ -62,6 +62,9 @@ static const ULONGLONG CORRELATION_WINDOW_MS = 5000;
 // Already-alerted PIDs (avoid duplicate alerts)
 static std::unordered_set<DWORD> g_alertedPids;
 
+// Tracked standalone remote threads to prevent spam without blocking the main alerts
+static std::unordered_set<DWORD> g_alertedRemoteThreads;
+
 // Process parent tracking: PID → parent PID
 static std::unordered_map<DWORD, DWORD> g_processParents;
 // Process image path tracking: PID → full image path
@@ -141,13 +144,14 @@ static void TryCorrelate(DWORD targetPid)
         auto& rt = rt_it->second.back();
         if (now - rt.timestamp < CORRELATION_WINDOW_MS)
         {
-            if (g_alertCallback)
+            if (g_alertCallback && !g_alertedRemoteThreads.count(targetPid))
             {
+                g_alertedRemoteThreads.insert(targetPid);
                 InjectionAlertEvent alert;
                 alert.sourcePid = rt.sourcePid;
                 alert.targetPid = targetPid;
                 alert.remoteThreadId = rt.threadId;
-                alert.technique = "RemoteThread";
+                alert.technique = "Remote Thread Injection";
                 alert.severity = "Medium";
                 EnrichAlert(alert);
                 g_alertCallback(alert);
@@ -177,7 +181,7 @@ static void TryCorrelate(DWORD targetPid)
                     alert.targetPid = targetPid;
                     alert.remoteThreadId = rt.threadId;
                     alert.dllPath = dll.dllPath;
-                    alert.technique = "LoadLibrary";
+                    alert.technique = "LoadLibrary Injection";
                     alert.severity = "Critical";
 
                     // Check for known malicious names
@@ -407,18 +411,28 @@ static void WINAPI EventRecordCallback(PEVENT_RECORD event)
                 // Try to correlate with an existing remote thread record
                 TryCorrelate(payload.processId);
 
-                // Even without correlation, a standalone suspicious DLL load
-                // is worth a High-level alert
+                // Only alert on standalone DLL loads if the name explicitly matches a malicious string.
+                // This prevents extreme false positives for legitimate unsinged DLLs.
                 if (!g_alertedPids.count(payload.processId) && g_alertCallback)
                 {
-                    InjectionAlertEvent alert;
-                    alert.sourcePid = 0;
-                    alert.targetPid = payload.processId;
-                    alert.dllPath = payload.imagePath;
-                    alert.technique = "LoadLibrary";
-                    alert.severity = "High";
-                    EnrichAlert(alert);
-                    g_alertCallback(alert);
+                    std::wstring filename = GetFilenameFromPath(payload.imagePath);
+                    std::transform(filename.begin(), filename.end(), filename.begin(), ::towlower);
+                    if (filename.find(L"malicious") != std::wstring::npos ||
+                        filename.find(L"inject")    != std::wstring::npos ||
+                        filename.find(L"payload")   != std::wstring::npos ||
+                        filename.find(L"hook")      != std::wstring::npos)
+                    {
+                        g_alertedPids.insert(payload.processId);
+
+                        InjectionAlertEvent alert;
+                        alert.sourcePid = 0;
+                        alert.targetPid = payload.processId;
+                        alert.dllPath = payload.imagePath;
+                        alert.technique = "LoadLibrary Injection";
+                        alert.severity = "High";
+                        EnrichAlert(alert);
+                        g_alertCallback(alert);
+                    }
                 }
             }
         }
@@ -492,6 +506,7 @@ static void WINAPI EventRecordCallback(PEVENT_RECORD event)
             g_remoteThreads.erase(pid);
             g_suspiciousDlls.erase(pid);
             g_alertedPids.erase(pid);
+            g_alertedRemoteThreads.erase(pid);
             g_processParents.erase(pid);
             g_processImagePaths.erase(pid);
         }
@@ -594,6 +609,7 @@ void StopEtwSession()
         g_remoteThreads.clear();
         g_suspiciousDlls.clear();
         g_alertedPids.clear();
+        g_alertedRemoteThreads.clear();
         g_processParents.clear();
         g_processImagePaths.clear();
     }
