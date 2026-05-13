@@ -17,9 +17,7 @@ namespace ArgusShieldDashboard.Pages
             TxtTotal.Text = stats.Total.ToString();
             TxtBlocked.Text = stats.Blocked.ToString();
             TxtToday.Text = stats.Today.ToString();
-            TxtDll.Text = stats.DllInjection.ToString();
-            TxtManualMapping.Text = stats.ManualMapping.ToString();
-            TxtProcessHollowing.Text = stats.ProcessHollowing.ToString();
+
 
             if (stats.Blocked > 0)
             {
@@ -66,11 +64,7 @@ namespace ArgusShieldDashboard.Pages
                 }
             }
 
-            // Fallback mock data if completely empty so chart doesn't look broken
-            if (recentDocs.Count == 0)
-            {
-                buckets = new int[] { 2, 5, 1, 8, 3, 0, 4 };
-            }
+
 
             int max = 1;
             foreach (var b in buckets) if (b > max) max = b;
