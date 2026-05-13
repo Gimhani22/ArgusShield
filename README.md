@@ -6,7 +6,7 @@ ArgusShield is a security research and detection tool for monitoring low-level s
 
 It is intended **only** for controlled, legitimate use by security professionals, researchers, and students.
 
-## Intended Use
+## Intended Use 
 
 Use ArgusShield strictly for:
 
