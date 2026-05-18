@@ -733,6 +733,9 @@ static bool BlockInjection(DWORD sourcePid, DWORD targetPid, DWORD threadId)
     bool blocked = false;
 
     // Strategy 1: Terminate the INJECTOR process (source PID)
+    // DISABLED for demo purposes: We leave the simulator alive so it can display
+    // the 'Attack Blocked' MessageBox to the Viva panel. The target process is still killed.
+    /*
     if (sourcePid != 0 && sourcePid != 4 && sourcePid != GetCurrentProcessId())
     {
         HANDLE hProcess = OpenProcess(PROCESS_TERMINATE, FALSE, sourcePid);
@@ -751,6 +754,7 @@ static bool BlockInjection(DWORD sourcePid, DWORD targetPid, DWORD threadId)
             CloseHandle(hProcess);
         }
     }
+    */
 
     // Strategy 2: Suspend and terminate the remote thread in the target process
     if (threadId != 0)
