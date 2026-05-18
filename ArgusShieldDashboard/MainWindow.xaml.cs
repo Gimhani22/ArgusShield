@@ -1,5 +1,6 @@
 using System;
 using System.ComponentModel;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -42,7 +43,7 @@ namespace ArgusShieldDashboard
             _pipeListener.ConnectionChanged += OnConnectionChanged;
             _pipeListener.Start();
 
-            _refreshTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+            _refreshTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
             _refreshTimer.Tick += (s, e) => PeriodicRefresh();
             _refreshTimer.Start();
         }
@@ -158,37 +159,49 @@ namespace ArgusShieldDashboard
             }
         }
 
-        private void BtnInstall_Click(object sender, RoutedEventArgs e)
+        private async void BtnInstall_Click(object sender, RoutedEventArgs e)
         {
-            if (!_installed)
+            BtnInstall.IsEnabled = false;
+            try
             {
-                var (ok, msg) = ServiceManager.InstallAll();
-                if (ok)
+                if (!_installed)
                 {
-                    _installed = true;
-                    Database.SetInstallState(true);
-                    SyncInstallButton();
-                    MessageBox.Show("ArgusShield Service + Agent installed and started.\nDashboard auto-start has been configured.", "ArgusShield", MessageBoxButton.OK, MessageBoxImage.Information);
+                    BtnInstall.Content = "Installing...";
+                    var (ok, msg) = await Task.Run(() => ServiceManager.InstallAll());
+                    if (ok)
+                    {
+                        _installed = true;
+                        Database.SetInstallState(true);
+                        SyncInstallButton();
+                        MessageBox.Show("ArgusShield Service + Agent installed and started.\nDashboard auto-start has been configured.", "ArgusShield", MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                    else
+                    {
+                        SyncInstallButton();
+                        MessageBox.Show(msg, "Installation Failed", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
                 }
                 else
                 {
-                    MessageBox.Show(msg, "Installation Failed", MessageBoxButton.OK, MessageBoxImage.Error);
+                    BtnInstall.Content = "Uninstalling...";
+                    var (ok, msg) = await Task.Run(() => ServiceManager.UninstallAll());
+                    if (ok)
+                    {
+                        _installed = false;
+                        Database.SetInstallState(false);
+                        SyncInstallButton();
+                        MessageBox.Show("ArgusShield Service + Agent uninstalled.\nDashboard auto-start has been removed.", "ArgusShield", MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                    else
+                    {
+                        SyncInstallButton();
+                        MessageBox.Show(msg, "Uninstall Failed", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
                 }
             }
-            else
+            finally
             {
-                var (ok, msg) = ServiceManager.UninstallAll();
-                if (ok)
-                {
-                    _installed = false;
-                    Database.SetInstallState(false);
-                    SyncInstallButton();
-                    MessageBox.Show("ArgusShield Service + Agent uninstalled.\nDashboard auto-start has been removed.", "ArgusShield", MessageBoxButton.OK, MessageBoxImage.Information);
-                }
-                else
-                {
-                    MessageBox.Show(msg, "Uninstall Failed", MessageBoxButton.OK, MessageBoxImage.Error);
-                }
+                BtnInstall.IsEnabled = true;
             }
         }
     }

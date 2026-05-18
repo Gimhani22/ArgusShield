@@ -233,7 +233,7 @@ static DWORD WINAPI DashPipeThread(LPVOID)
         HANDLE pipe = CreateNamedPipeW(
             kDashboardPipe,
             PIPE_ACCESS_OUTBOUND,
-            PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_WAIT,
+            PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT,
             1, 8192, 8192, 0, nullptr);
 
         if (pipe == INVALID_HANDLE_VALUE)

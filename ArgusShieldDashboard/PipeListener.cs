@@ -33,7 +33,7 @@ namespace ArgusShieldDashboard
         {
             while (!token.IsCancellationRequested)
             {
-                using var stream = new NamedPipeClientStream(".", PIPE_NAME, PipeDirection.In, PipeOptions.Asynchronous);
+                using var stream = new NamedPipeClientStream(".", PIPE_NAME, PipeDirection.In, PipeOptions.None);
                 try
                 {
                     await stream.ConnectAsync(2000, token);
