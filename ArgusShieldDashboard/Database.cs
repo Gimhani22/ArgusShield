@@ -253,6 +253,7 @@ namespace ArgusShieldDashboard
             return count;
         }
 
+        // Dashboard: only show real threats (ALERT + BLOCKING), never SKIPPED events
         public static List<EventDetection> GetRecentDetections(int limit = 20)
         {
             var list = new List<EventDetection>();
@@ -264,6 +265,44 @@ namespace ArgusShieldDashboard
                     SELECT timestamp, component, event_type, pid, target_pid,
                            dll_path, technique, severity, action, details
                     FROM events
+                    WHERE event_type IN ('ALERT', 'BLOCKING')
+                    ORDER BY id DESC LIMIT @limit";
+                cmd.Parameters.AddWithValue("@limit", limit);
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    list.Add(new EventDetection
+                    {
+                        Timestamp = reader.GetString(0),
+                        Component = reader.GetString(1),
+                        EventType = reader.GetString(2),
+                        Pid = reader.GetInt32(3),
+                        TargetPid = reader.GetInt32(4),
+                        DllPath = reader.GetString(5),
+                        Technique = reader.GetString(6),
+                        Severity = reader.GetString(7),
+                        Action = reader.GetString(8),
+                        Details = reader.GetString(9)
+                    });
+                }
+            }
+            catch { }
+            return list;
+        }
+
+        // Quarantine page: only show BLOCKED events (action = 'Blocked')
+        public static List<EventDetection> GetBlockedDetections(int limit = 200)
+        {
+            var list = new List<EventDetection>();
+            try
+            {
+                using var conn = GetConnection();
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = @"
+                    SELECT timestamp, component, event_type, pid, target_pid,
+                           dll_path, technique, severity, action, details
+                    FROM events
+                    WHERE action = 'Blocked'
                     ORDER BY id DESC LIMIT @limit";
                 cmd.Parameters.AddWithValue("@limit", limit);
                 using var reader = cmd.ExecuteReader();
@@ -296,35 +335,36 @@ namespace ArgusShieldDashboard
                 using var conn = GetConnection();
                 using var cmd = conn.CreateCommand();
 
-                cmd.CommandText = "SELECT COUNT(*) FROM events";
+                // Only count real threat events — not SKIPPED (legitimate) events
+                cmd.CommandText = "SELECT COUNT(*) FROM events WHERE event_type IN ('ALERT', 'BLOCKING')";
                 stats.Total = Convert.ToInt32(cmd.ExecuteScalar() ?? 0);
 
                 cmd.CommandText = "SELECT COUNT(*) FROM events WHERE action = 'Blocked'";
                 stats.Blocked = Convert.ToInt32(cmd.ExecuteScalar() ?? 0);
 
-                cmd.CommandText = "SELECT COUNT(*) FROM events WHERE severity = 'Critical'";
+                cmd.CommandText = "SELECT COUNT(*) FROM events WHERE event_type IN ('ALERT', 'BLOCKING') AND severity = 'Critical'";
                 stats.Critical = Convert.ToInt32(cmd.ExecuteScalar() ?? 0);
 
-                cmd.CommandText = "SELECT COUNT(*) FROM events WHERE severity = 'High'";
+                cmd.CommandText = "SELECT COUNT(*) FROM events WHERE event_type IN ('ALERT', 'BLOCKING') AND severity = 'High'";
                 stats.High = Convert.ToInt32(cmd.ExecuteScalar() ?? 0);
 
-                cmd.CommandText = "SELECT COUNT(*) FROM events WHERE severity = 'Medium'";
+                cmd.CommandText = "SELECT COUNT(*) FROM events WHERE event_type IN ('ALERT', 'BLOCKING') AND severity = 'Medium'";
                 stats.Medium = Convert.ToInt32(cmd.ExecuteScalar() ?? 0);
 
-                cmd.CommandText = "SELECT COUNT(*) FROM events WHERE severity = 'Low'";
+                cmd.CommandText = "SELECT COUNT(*) FROM events WHERE event_type IN ('ALERT', 'BLOCKING') AND severity = 'Low'";
                 stats.Low = Convert.ToInt32(cmd.ExecuteScalar() ?? 0);
 
-                cmd.CommandText = "SELECT COUNT(*) FROM events WHERE timestamp LIKE @today";
+                cmd.CommandText = "SELECT COUNT(*) FROM events WHERE event_type IN ('ALERT', 'BLOCKING') AND timestamp LIKE @today";
                 cmd.Parameters.AddWithValue("@today", $"{DateTime.Today.ToString("yyyy-MM-dd")}%");
                 stats.Today = Convert.ToInt32(cmd.ExecuteScalar() ?? 0);
 
-                cmd.CommandText = "SELECT COUNT(*) FROM events WHERE technique = 'LoadLibrary'";
+                cmd.CommandText = "SELECT COUNT(*) FROM events WHERE technique LIKE '%LoadLibrary%' OR technique LIKE '%DLL Injection%'";
                 stats.DllInjection = Convert.ToInt32(cmd.ExecuteScalar() ?? 0);
 
-                cmd.CommandText = "SELECT COUNT(*) FROM events WHERE technique = 'ManualMapping'";
+                cmd.CommandText = "SELECT COUNT(*) FROM events WHERE technique LIKE '%Manual Mapping%'";
                 stats.ManualMapping = Convert.ToInt32(cmd.ExecuteScalar() ?? 0);
 
-                cmd.CommandText = "SELECT COUNT(*) FROM events WHERE technique = 'ProcessHollowing'";
+                cmd.CommandText = "SELECT COUNT(*) FROM events WHERE technique LIKE '%Hollowing%'";
                 stats.ProcessHollowing = Convert.ToInt32(cmd.ExecuteScalar() ?? 0);
             }
             catch { }
