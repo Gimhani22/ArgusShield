@@ -137,8 +137,8 @@ const char* DetectionTypeToSeverity(DetectionType type)
 
 struct ProcessInfo
 {
-    DWORD       pid;
-    DWORD       parentPid;
+    DWORD       pid = 0;
+    DWORD       parentPid = 0;
     std::string name;
 };
 

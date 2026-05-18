@@ -32,7 +32,7 @@ enum class DetectionType
 
 struct MemoryScanResult
 {
-    DetectionType   type;
+    DetectionType   type           = DetectionType::RWXMemory;
     DWORD           pid            = 0;
     DWORD           parentPid      = 0;
     std::string     processName;

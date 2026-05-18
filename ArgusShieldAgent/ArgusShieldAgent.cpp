@@ -808,6 +808,11 @@ static std::string GetField(const std::string& line, const std::string& key)
 
 // ── Process incoming messages from the Service pipe ─────────────────────────
 
+// Cross-source dedup: PIDs already handled by the memory scanner (to suppress ETW duplicates)
+static std::mutex g_MemScanHandledMutex;
+static std::unordered_map<DWORD, ULONGLONG> g_MemScanHandledPids;
+static const ULONGLONG CROSS_DEDUP_WINDOW_MS = 30000; // 30 second window
+
 static void ProcessLine(const std::string& line)
 {
     // ── Injection Alert from the Service ────────────────────────────────
@@ -826,6 +831,27 @@ static void ProcessLine(const std::string& line)
             + " Source=" + std::to_string(sourcePid)
             + " Target=" + std::to_string(targetPid)
             + " DLL=" + dllPath);
+
+        // ── Cross-source dedup: skip if memory scanner already handled this PID ──
+        {
+            std::lock_guard<std::mutex> lk(g_MemScanHandledMutex);
+            ULONGLONG now = GetTickCount64();
+            auto it = g_MemScanHandledPids.find(sourcePid);
+            if (it != g_MemScanHandledPids.end() && (now - it->second < CROSS_DEDUP_WINDOW_MS))
+            {
+                Log("DEDUP: Skipping ETW alert for PID=" + std::to_string(sourcePid)
+                    + " — already handled by memory scanner");
+                return;
+            }
+            // Also check target PID
+            auto it2 = g_MemScanHandledPids.find(targetPid);
+            if (targetPid != 0 && it2 != g_MemScanHandledPids.end() && (now - it2->second < CROSS_DEDUP_WINDOW_MS))
+            {
+                Log("DEDUP: Skipping ETW alert for targetPID=" + std::to_string(targetPid)
+                    + " — already handled by memory scanner");
+                return;
+            }
+        }
 
         // ── Record injection in behavior history ───────────────────────
         RecordInjection(sourcePid, targetPid);
@@ -965,14 +991,14 @@ static void ReadServicePipe(HANDLE pipeHandle)
 // Track already-alerted PIDs to avoid duplicate scan alerts per session
 static std::mutex g_ScanAlertMutex;
 static std::unordered_map<DWORD, ULONGLONG> g_ScanAlertedPids;
-static const ULONGLONG SCAN_ALERT_COOLDOWN_MS = 60000; // 60 seconds cooldown per PID
+static const ULONGLONG SCAN_ALERT_COOLDOWN_MS = 20000; // 20 seconds cooldown per PID
 
 static DWORD WINAPI MemoryScanThread(LPVOID)
 {
     Log("Memory scanner started (Manual Mapping + Process Hollowing detection)");
 
-    // Wait 10 seconds on startup to let system settle
-    for (int i = 0; i < 20 && g_Running; i++)
+    // Wait 2 seconds on startup to let system settle
+    for (int i = 0; i < 4 && g_Running; i++)
         Sleep(500);
 
     while (g_Running)
@@ -992,6 +1018,13 @@ static DWORD WINAPI MemoryScanThread(LPVOID)
                         continue;  // Skip — recently alerted
                 }
                 g_ScanAlertedPids[finding.pid] = now;
+            }
+
+            // ── Register this PID as handled by memory scanner (suppress ETW duplicates)
+            {
+                std::lock_guard<std::mutex> lk(g_MemScanHandledMutex);
+                ULONGLONG now = GetTickCount64();
+                g_MemScanHandledPids[finding.pid] = now;
             }
 
             const char* technique = DetectionTypeToTechnique(finding.type);
@@ -1056,9 +1089,9 @@ static DWORD WINAPI MemoryScanThread(LPVOID)
             SendToDashboard(dashMsg.str());
         }
 
-        // Sleep 2 seconds between scans (check g_Running every 500ms)
-        for (int i = 0; i < 4 && g_Running; i++)
-            Sleep(500);
+        // Sleep 50ms between scans to prevent 100% CPU usage while maintaining fast detection
+        for (int i = 0; i < 2 && g_Running; i++)
+            Sleep(25);
     }
 
     Log("Memory scanner stopped.");
